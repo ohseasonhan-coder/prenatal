@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import coupleBabyPng from "./assets/characters/couple_baby.png";
 
 const STORAGE_KEY = "taegyo_book_family_v2";
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -137,11 +138,11 @@ function FamilyIllustration({ character, mood }) {
   if (character === "couple_baby") {
     return (
       <image
-        href="/assets/characters/couple_baby.png"
-        x="48"
-        y="28"
-        width="324"
-        height="220"
+        href={coupleBabyPng}
+        x="42"
+        y="22"
+        width="336"
+        height="222"
         preserveAspectRatio="xMidYMid meet"
       />
     );
