@@ -134,7 +134,18 @@ function FamilyIllustration({ character, mood }) {
   if (character === "mama_cat") return <><Mom x={200} y={116} scale={1.04}/><Pet type="cat" x={300} y={190}/></>;
   if (character === "mama_friend") return <><Mom x={168} y={120} scale={.94}/><Mom x={248} y={121} scale={.9}/></>;
   if (character === "mama_grandma") return <><Mom x={168} y={120} scale={.96}/><Mom x={252} y={122} scale={.9}/></>;
-  if (character === "couple_baby") return <><Dad x={155} y={118} scale={.96}/><Mom x={255} y={118} scale={1}/><Baby x={208} y={184} scale={.82}/></>;
+  if (character === "couple_baby") {
+    return (
+      <image
+        href="/assets/characters/couple_baby.png"
+        x="48"
+        y="28"
+        width="324"
+        height="220"
+        preserveAspectRatio="xMidYMid meet"
+      />
+    );
+  }
   return <><Dad/><Mom/><Baby/><Child/></>;
 }
 
