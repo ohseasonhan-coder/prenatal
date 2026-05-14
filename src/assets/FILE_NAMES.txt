@@ -1,0 +1,4 @@
+backgrounds: garden, room, sky, night, beach, forest, cafe, rain, snow, library, studio, clinic, picnic
+characters: mama, mama_papa, family, mama_pet, mama_cat, mama_friend, mama_grandma, couple_baby
+activities: taedam, music, book, walk, art, cooking, rest, exercise, meditation, prenatal_music, letter, photo, knitting, bath, yoga, ultrasound, nursery, shopping, picnic, prayer
+decorations: heart_leaf, sparkles, soft_frame
