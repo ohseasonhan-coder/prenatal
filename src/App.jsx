@@ -1,4 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import familyPng from "./assets/characters/family.png";
+import mamaPng from "./assets/characters/mama.png";
+import mamaPapaPng from "./assets/characters/mama_papa.png";
+import mamaPetPng from "./assets/characters/mama_pet.png";
+import mamaCatPng from "./assets/characters/mama_cat.png";
+import mamaFriendPng from "./assets/characters/mama_friend.png";
+import mamaGrandmaPng from "./assets/characters/mama_grandma.png";
 import coupleBabyPng from "./assets/characters/couple_baby.png";
 
 const STORAGE_KEY = "taegyo_book_family_v2";
@@ -57,6 +64,17 @@ const INITIAL = {
 const getMood = (id) => MOODS.find((m) => m.id === id) || MOODS[0];
 const getActivity = (id) => ACTIVITIES.find((a) => a.id === id) || ACTIVITIES[0];
 
+const CHARACTER_ASSETS = {
+  family: familyPng,
+  mama: mamaPng,
+  mama_papa: mamaPapaPng,
+  mama_pet: mamaPetPng,
+  mama_cat: mamaCatPng,
+  mama_friend: mamaFriendPng,
+  mama_grandma: mamaGrandmaPng,
+  couple_baby: coupleBabyPng
+};
+
 function usePlanner() {
   const [data, setData] = useState(() => {
     try {
@@ -111,6 +129,21 @@ function MoodFx({ mood }) {
 }
 
 function FamilyIllustration({ character, mood }) {
+  const characterSrc = CHARACTER_ASSETS[character] || CHARACTER_ASSETS.family;
+
+  if (characterSrc) {
+    return (
+      <image
+        href={characterSrc}
+        x="42"
+        y="18"
+        width="336"
+        height="228"
+        preserveAspectRatio="xMidYMid meet"
+      />
+    );
+  }
+
   const m = getMood(mood);
   const skin = "#ffd8c6";
   const cheek = "#ec9b90";
@@ -135,18 +168,7 @@ function FamilyIllustration({ character, mood }) {
   if (character === "mama_cat") return <><Mom x={200} y={116} scale={1.04}/><Pet type="cat" x={300} y={190}/></>;
   if (character === "mama_friend") return <><Mom x={168} y={120} scale={.94}/><Mom x={248} y={121} scale={.9}/></>;
   if (character === "mama_grandma") return <><Mom x={168} y={120} scale={.96}/><Mom x={252} y={122} scale={.9}/></>;
-  if (character === "couple_baby") {
-    return (
-      <image
-        href={coupleBabyPng}
-        x="42"
-        y="22"
-        width="336"
-        height="222"
-        preserveAspectRatio="xMidYMid meet"
-      />
-    );
-  }
+  if (character === "couple_baby") return <><Dad x={155} y={118} scale={.96}/><Mom x={255} y={118} scale={1}/><Baby x={208} y={184} scale={.82}/></>;
   return <><Dad/><Mom/><Baby/><Child/></>;
 }
 
