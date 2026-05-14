@@ -1,7 +1,6 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "installCommand": "npm install",
   "framework": "vite",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "installCommand": "corepack enable && pnpm install --no-frozen-lockfile",
+  "buildCommand": "corepack enable && pnpm run build",
+  "outputDirectory": "dist"
 }
