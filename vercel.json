@@ -1,6 +1,6 @@
 {
   "framework": "vite",
-  "installCommand": "corepack enable && pnpm install --no-frozen-lockfile",
-  "buildCommand": "corepack enable && pnpm run build",
+  "installCommand": "corepack enable && yarn install --no-lockfile --non-interactive",
+  "buildCommand": "yarn build",
   "outputDirectory": "dist"
 }
