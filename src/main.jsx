@@ -1,7 +1,14 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App.jsx";
 import "./index.css";
+
+/*
+  일부 App.jsx 코드가 React.Fragment, React.createElement 등
+  React 전역 객체를 직접 참조하는 경우를 대비해 먼저 등록합니다.
+*/
+globalThis.React = React;
+
+const { default: App } = await import("./App.jsx");
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
