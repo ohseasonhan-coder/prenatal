@@ -16,7 +16,6 @@ import artPng from "./assets/activities/art.png";
 import cookingPng from "./assets/activities/cooking.png";
 import restPng from "./assets/activities/rest.png";
 import exercisePng from "./assets/activities/exercise.png";
-import meditationPng from "./assets/activities/meditation.png";
 import prenatalMusicPng from "./assets/activities/prenatal_music.png";
 import letterPng from "./assets/activities/letter.png";
 import knittingPng from "./assets/activities/knitting.png";
@@ -116,7 +115,6 @@ const ACTIVITY_ASSETS = {
   요리: cookingPng,
   휴식: restPng,
   운동: exercisePng,
-  명상: meditationPng,
   태교음악: prenatalMusicPng,
   편지: letterPng,
   뜨개질: knittingPng,
