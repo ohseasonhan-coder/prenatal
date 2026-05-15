@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+
 import familyPng from "./assets/characters/family.png";
 import mamaPng from "./assets/characters/mama.png";
 import mamaPapaPng from "./assets/characters/mama_papa.png";
@@ -7,6 +8,25 @@ import mamaCatPng from "./assets/characters/mama_cat.png";
 import mamaFriendPng from "./assets/characters/mama_friend.png";
 import mamaGrandmaPng from "./assets/characters/mama_grandma.png";
 import coupleBabyPng from "./assets/characters/couple_baby.png";
+
+import taedamPng from "./assets/activities/taedam.png";
+import musicPng from "./assets/activities/music.png";
+import bookPng from "./assets/activities/book.png";
+import artPng from "./assets/activities/art.png";
+import cookingPng from "./assets/activities/cooking.png";
+import restPng from "./assets/activities/rest.png";
+import exercisePng from "./assets/activities/exercise.png";
+import meidationPng from "./assets/activities/meidation.png";
+import prenatalMusicPng from "./assets/activities/prenatal_music.png";
+import letterPng from "./assets/activities/letter.png";
+import knittingPng from "./assets/activities/knitting.png";
+import bathPng from "./assets/activities/bath.png";
+import yogaPng from "./assets/activities/yoga.png";
+import ultrasoundPng from "./assets/activities/ultrasound.png";
+import nurseryPng from "./assets/activities/nursery.png";
+import shoppingPng from "./assets/activities/shopping.png";
+import picnicPng from "./assets/activities/picnic.png";
+import prayerPng from "./assets/activities/prayer.png";
 
 const STORAGE_KEY = "taegyo_book_family_v2";
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -48,11 +68,24 @@ const CHARACTERS = [
   { id: "mama_grandma", label: "엄마 + 할머니", emoji: "👵" }, { id: "couple_baby", label: "부부 + 아기상상", emoji: "👶" }
 ];
 const ACTIVITIES = [
-  { id: "태담", label: "태담", emoji: "💬" }, { id: "음악", label: "음악 듣기", emoji: "🎵" }, { id: "독서", label: "독서", emoji: "📖" }, { id: "산책", label: "산책", emoji: "🌿" },
-  { id: "그림", label: "그림", emoji: "🎨" }, { id: "요리", label: "요리", emoji: "🍲" }, { id: "휴식", label: "휴식", emoji: "🧸" }, { id: "운동", label: "운동", emoji: "🤸" },
-  { id: "명상", label: "명상", emoji: "🧘" }, { id: "태교음악", label: "태교음악", emoji: "🎹" }, { id: "편지", label: "편지 쓰기", emoji: "✉️" }, { id: "사진", label: "사진 찍기", emoji: "📸" },
-  { id: "뜨개질", label: "뜨개질", emoji: "🧶" }, { id: "목욕", label: "따뜻한 목욕", emoji: "🛁" }, { id: "요가", label: "임산부 요가", emoji: "🧘‍♀️" }, { id: "초음파", label: "초음파 보기", emoji: "🩺" },
-  { id: "아기방", label: "아기방 꾸미기", emoji: "🛏️" }, { id: "쇼핑", label: "출산용품 준비", emoji: "🛍️" }, { id: "피크닉", label: "피크닉", emoji: "🧺" }, { id: "기도", label: "기도/소원", emoji: "🙏" }
+  { id: "태담", label: "태담", emoji: "💬" },
+  { id: "음악", label: "음악 듣기", emoji: "🎵" },
+  { id: "독서", label: "독서", emoji: "📖" },
+  { id: "그림", label: "그림", emoji: "🎨" },
+  { id: "요리", label: "요리", emoji: "🍲" },
+  { id: "휴식", label: "휴식", emoji: "🧸" },
+  { id: "운동", label: "운동", emoji: "🤸" },
+  { id: "명상", label: "명상", emoji: "🧘" },
+  { id: "태교음악", label: "태교음악", emoji: "🎹" },
+  { id: "편지", label: "편지 쓰기", emoji: "✉️" },
+  { id: "뜨개질", label: "뜨개질", emoji: "🧶" },
+  { id: "목욕", label: "따뜻한 목욕", emoji: "🛁" },
+  { id: "요가", label: "임산부 요가", emoji: "🧘‍♀️" },
+  { id: "초음파", label: "초음파 보기", emoji: "🩺" },
+  { id: "아기방", label: "아기방 꾸미기", emoji: "🛏️" },
+  { id: "쇼핑", label: "출산용품 준비", emoji: "🛍️" },
+  { id: "피크닉", label: "피크닉", emoji: "🧺" },
+  { id: "기도", label: "기도/소원", emoji: "🙏" }
 ];
 
 const INITIAL = {
@@ -73,6 +106,27 @@ const CHARACTER_ASSETS = {
   mama_friend: mamaFriendPng,
   mama_grandma: mamaGrandmaPng,
   couple_baby: coupleBabyPng
+};
+
+const ACTIVITY_ASSETS = {
+  태담: taedamPng,
+  음악: musicPng,
+  독서: bookPng,
+  그림: artPng,
+  요리: cookingPng,
+  휴식: restPng,
+  운동: exercisePng,
+  명상: meidationPng,
+  태교음악: prenatalMusicPng,
+  편지: letterPng,
+  뜨개질: knittingPng,
+  목욕: bathPng,
+  요가: yogaPng,
+  초음파: ultrasoundPng,
+  아기방: nurseryPng,
+  쇼핑: shoppingPng,
+  피크닉: picnicPng,
+  기도: prayerPng
 };
 
 function usePlanner() {
@@ -173,13 +227,42 @@ function FamilyIllustration({ character, mood }) {
 }
 
 function ActivityLayer({ activity, mood }) {
-  const a = getActivity(activity), m = getMood(mood);
-  if (["음악", "태교음악"].includes(activity)) return <g fill={m.deep} opacity=".72"><text x="70" y="75" fontSize="30">♪</text><text x="104" y="102" fontSize="25">♫</text><text x="326" y="92" fontSize="24">♬</text></g>;
-  if (["독서", "편지"].includes(activity)) return <g transform="translate(82 202)"><path d="M-34 -18 Q-10 -30 0 -10 V22 Q-16 8 -34 15 Z" fill="#fff" opacity=".94" stroke={m.accent} strokeWidth="3"/><path d="M34 -18 Q10 -30 0 -10 V22 Q16 8 34 15 Z" fill="#fff" opacity=".94" stroke={m.accent} strokeWidth="3"/></g>;
-  if (activity === "그림") return <g transform="translate(86 204)"><rect x="-32" y="-22" width="64" height="36" rx="10" fill="#fff" opacity=".94"/><circle cx="-15" cy="-4" r="6" fill="#ff91ad"/><circle cx="1" cy="-7" r="6" fill="#8dd1ff"/><circle cx="17" cy="-3" r="6" fill="#ffe083"/></g>;
-  if (["산책", "운동", "요가", "피크닉"].includes(activity)) return <g transform="translate(82 203)" opacity=".84"><path d="M0 22 Q18 0 36 22" stroke={m.accent} strokeWidth="5" fill="none" strokeLinecap="round"/><path d="M48 22 Q66 0 84 22" stroke={m.accent} strokeWidth="5" fill="none" strokeLinecap="round"/><text x="44" y="-7" fontSize="25" textAnchor="middle">🌿</text></g>;
-  if (["사진", "초음파", "아기방", "쇼핑", "기도", "뜨개질", "목욕", "요리", "휴식", "명상"].includes(activity)) return <g transform="translate(332 177)"><rect x="-34" y="-26" width="68" height="52" rx="18" fill="#fff" opacity=".88"/><text x="0" y="10" textAnchor="middle" fontSize="29">{a.emoji}</text></g>;
-  return <g transform="translate(333 78)"><rect x="-34" y="-22" width="68" height="44" rx="22" fill="#fff" opacity=".9"/><text x="0" y="10" textAnchor="middle" fontSize="27">{a.emoji}</text></g>;
+  const a = getActivity(activity);
+  const m = getMood(mood);
+  const activitySrc = ACTIVITY_ASSETS[activity];
+
+  if (activitySrc) {
+    return (
+      <g transform="translate(304 34)">
+        <rect
+          x="-8"
+          y="-8"
+          width="86"
+          height="86"
+          rx="28"
+          fill="#fff"
+          opacity=".88"
+        />
+        <image
+          href={activitySrc}
+          x="0"
+          y="0"
+          width="70"
+          height="70"
+          preserveAspectRatio="xMidYMid meet"
+        />
+      </g>
+    );
+  }
+
+  return (
+    <g transform="translate(333 78)">
+      <rect x="-34" y="-22" width="68" height="44" rx="22" fill="#fff" opacity=".9" />
+      <text x="0" y="10" textAnchor="middle" fontSize="27" fill={m.deep}>
+        {a.emoji}
+      </text>
+    </g>
+  );
 }
 
 function SceneComposer({ mood = "사랑", bg = "garden", character = "family", activity = "태담", small = false, editable = false, onEdit }) {
@@ -226,7 +309,7 @@ function DailyForm({ setData, setTab }) {
   return <div className="card pad"><h2 className="form-title">Chapter 2. 임신 주차별 기록</h2>{form.photo ? <PhotoSlot photo={form.photo} onPhoto={(v) => update("photo", v)} onRemove={() => update("photo", "")} /> : <SceneWizard scene={scene} onChange={setScene} title="오늘의 그림 수정"/>}<div className="photo-line"><PhotoSlot photo={form.photo} onPhoto={(v) => update("photo", v)} onRemove={() => update("photo", "")} /></div><div className="two"><label>날짜<input type="date" value={form.date} onChange={(e) => update("date", e.target.value)} /></label><label>임신 주차<input value={form.week} onChange={(e) => update("week", e.target.value)} placeholder="예: 18주차" /></label></div><label>엄마의 컨디션<input value={form.condition} onChange={(e) => update("condition", e.target.value)} placeholder="예: 조금 피곤했지만 편안함" /></label><label>아기에게 한마디<textarea value={form.message} onChange={(e) => update("message", e.target.value)} /></label><label>오늘의 기억<textarea value={form.memory} onChange={(e) => update("memory", e.target.value)} /></label><button className="primary" onClick={save}>✨ 기록 저장하기</button></div>;
 }
 function ActivityForm({ setData, setTab }) {
-  const [scene, setScene] = useState({ mood: "평온함", bg: "picnic", character: "mama_papa", activity: "산책" });
+  const [scene, setScene] = useState({ mood: "평온함", bg: "picnic", character: "mama_papa", activity: "피크닉" });
   const [form, setForm] = useState({ date: today(), withWhom: "", feeling: "", message: "", photo: "" });
   const update = (key, value) => setForm((p) => ({ ...p, [key]: value }));
   const save = () => { setData((p) => ({ ...p, activityRecords: sortByDate([...p.activityRecords, { ...form, ...scene, id: uid(), createdAt: new Date().toISOString() }]) })); setTab("book"); };
