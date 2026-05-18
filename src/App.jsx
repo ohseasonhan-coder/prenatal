@@ -194,13 +194,13 @@ function FamilyIllustration({ character, mood }) {
 
   if (characterSrc) {
     return (
-      <g transform="translate(0 -26)">
+      <g transform="translate(0 -24)">
         <image
           href={characterSrc}
-          x="80"
-          y="20"
-          width="260"
-          height="178"
+          x="70"
+          y="14"
+          width="280"
+          height="192"
           preserveAspectRatio="xMidYMid meet"
         />
       </g>
