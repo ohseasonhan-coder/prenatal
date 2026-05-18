@@ -395,7 +395,7 @@ function IntroForm({ data, setData, setWriteTab }) {
   const update = (key, value) => setData((p) => ({ ...p, babyInfo: { ...p.babyInfo, [key]: value } }));
   const finishIntro = () => {
     setData((p) => ({ ...p, babyInfo: { ...p.babyInfo, introCompleted: true } }));
-    setWriteTab("daily");
+    setWriteTab("choose");
   };
   return <div className="card pad"><h2 className="form-title">Chapter 1. 우리 아기를 기다리며</h2><p className="muted-text">{completed ? "첫 이야기는 저장되어 있어요. 필요한 부분만 수정한 뒤 완료를 눌러주세요." : "처음 접속했을 때만 기본 정보를 작성하고, 이후에는 수정용으로만 사용됩니다."}</p><label>태명<input value={b.babyName} onChange={(e) => update("babyName", e.target.value)} /></label><label>출산 예정일<input type="date" value={b.dueDate} onChange={(e) => update("dueDate", e.target.value)} /></label><div className="two"><label>엄마 이름<input value={b.motherName} onChange={(e) => update("motherName", e.target.value)} /></label><label>아빠 이름<input value={b.fatherName} onChange={(e) => update("fatherName", e.target.value)} /></label></div><label>처음 알게 된 날<input type="date" value={b.firstFoundDate} onChange={(e) => update("firstFoundDate", e.target.value)} /></label><label>처음 느낀 마음<textarea value={b.firstFeeling} onChange={(e) => update("firstFeeling", e.target.value)} /></label><label>아기에게 첫 편지<textarea value={b.firstLetter} onChange={(e) => update("firstLetter", e.target.value)} /></label><button className="primary" onClick={finishIntro}>{completed ? "수정 완료" : "첫 이야기 저장하기"}</button></div>;
 }
@@ -427,10 +427,40 @@ function PrepareForm({ data, setData }) {
   const List = ({ title, items, type }) => <section className="todo-section"><h3>{title}</h3>{items.map((item) => <div className="todo" key={item.id}><button className={item.done ? "check on" : "check"} onClick={() => toggle(type, item.id)}>{item.done ? "✓" : ""}</button><span className={item.done ? "done" : ""}>{item.text}</span><button onClick={() => remove(type, item.id)}>삭제</button></div>)}</section>;
   return <div className="card pad"><h2 className="form-title">Chapter 5. 출산 준비 & 버킷리스트</h2><div className="add"><input value={text} onChange={(e) => setText(e.target.value)} placeholder="준비할 것 추가"/><button onClick={() => add("checklistItems", text, setText)}>추가</button></div><List title="출산 준비 체크리스트" items={data.checklistItems} type="checklistItems"/><div className="add"><input value={bucket} onChange={(e) => setBucket(e.target.value)} placeholder="하고 싶은 일 추가"/><button onClick={() => add("bucketListItems", bucket, setBucket)}>추가</button></div><List title="출산 전 버킷리스트" items={data.bucketListItems} type="bucketListItems"/></div>;
 }
+function RecordCategoryChooser({ setWriteTab }) {
+  const options = [
+    { id: "daily", icon: "🗓️", title: "주차 기록", desc: "임신 주차, 컨디션, 오늘의 기억을 남겨요." },
+    { id: "activity", icon: "🌿", title: "태교 활동", desc: "태담, 음악, 독서, 요가 같은 활동을 기록해요." },
+    { id: "hospital", icon: "🏥", title: "병원 기록", desc: "검진 내용, 초음파, 다음 진료일을 정리해요." }
+  ];
+
+  return (
+    <div className="card pad">
+      <h2 className="form-title">오늘은 어떤 기록을 남길까요?</h2>
+      <p className="muted-text">Chapter 1을 작성한 뒤에는 기록으로 들어올 때마다 아래 3가지 중 하나를 선택해서 바로 입력할 수 있어요.</p>
+      <section className="quick-grid">
+        {options.map((item) => (
+          <button key={item.id} type="button" className="quick" onClick={() => setWriteTab(item.id)}>
+            <span>{item.icon}</span>
+            <div>
+              <strong>{item.title}</strong>
+              <small>{item.desc}</small>
+            </div>
+          </button>
+        ))}
+      </section>
+      <button type="button" className="ghost full" onClick={() => setWriteTab("intro")}>Chapter 1 첫 이야기 수정하기</button>
+    </div>
+  );
+}
+
 function Write({ data, setData, writeTab, setWriteTab, setTab }) {
   const introDone = isIntroWritten(data.babyInfo);
-  const tabs = [{ id: "intro", label: introDone ? "첫 이야기 수정" : "첫 이야기" }, { id: "daily", label: "주차 기록" }, { id: "activity", label: "태교 활동" }, { id: "hospital", label: "병원" }, { id: "prepare", label: "준비" }];
-  return <main className="screen"><div className="tabs">{tabs.map((t) => <button key={t.id} className={writeTab === t.id ? "on" : ""} onClick={() => setWriteTab(t.id)}>{t.label}</button>)}</div>{writeTab === "intro" && <IntroForm data={data} setData={setData} setWriteTab={setWriteTab}/>} {writeTab === "daily" && <DailyForm setData={setData} setTab={setTab}/>} {writeTab === "activity" && <ActivityForm setData={setData} setTab={setTab}/>} {writeTab === "hospital" && <HospitalForm setData={setData} setTab={setTab}/>} {writeTab === "prepare" && <PrepareForm data={data} setData={setData}/>}</main>;
+  const tabs = introDone
+    ? [{ id: "choose", label: "기록 선택" }, { id: "intro", label: "첫 이야기 수정" }, { id: "daily", label: "주차 기록" }, { id: "activity", label: "태교 활동" }, { id: "hospital", label: "병원" }, { id: "prepare", label: "준비" }]
+    : [{ id: "intro", label: "첫 이야기" }];
+
+  return <main className="screen"><div className="tabs">{tabs.map((t) => <button key={t.id} className={writeTab === t.id ? "on" : ""} onClick={() => setWriteTab(t.id)}>{t.label}</button>)}</div>{writeTab === "choose" && <RecordCategoryChooser setWriteTab={setWriteTab}/>} {writeTab === "intro" && <IntroForm data={data} setData={setData} setWriteTab={setWriteTab}/>} {writeTab === "daily" && <DailyForm setData={setData} setTab={setTab}/>} {writeTab === "activity" && <ActivityForm setData={setData} setTab={setTab}/>} {writeTab === "hospital" && <HospitalForm setData={setData} setTab={setTab}/>} {writeTab === "prepare" && <PrepareForm data={data} setData={setData}/>}</main>;
 }
 function Book({ data, setData }) {
   const remove = (key, id) => setData((p) => ({ ...p, [key]: p[key].filter((item) => item.id !== id) }));
@@ -445,12 +475,12 @@ function Settings({ setData }) {
 export default function App() {
   const [data, setData] = usePlanner();
   const [tab, setTab] = useState("home");
-  const [writeTab, setWriteTab] = useState(() => isIntroWritten(data.babyInfo) ? "daily" : "intro");
+  const [writeTab, setWriteTab] = useState(() => isIntroWritten(data.babyInfo) ? "choose" : "intro");
   useEffect(() => {
-    if (writeTab === "intro" && isIntroWritten(data.babyInfo)) setWriteTab("daily");
+    if (writeTab === "intro" && isIntroWritten(data.babyInfo)) setWriteTab("choose");
   }, []);
   const openWrite = () => {
-    setWriteTab(isIntroWritten(data.babyInfo) ? "daily" : "intro");
+    setWriteTab(isIntroWritten(data.babyInfo) ? "choose" : "intro");
     setTab("write");
   };
   const mood = getMood(data.babyInfo.coverMood);
