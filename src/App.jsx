@@ -88,7 +88,7 @@ const ACTIVITIES = [
 ];
 
 const INITIAL = {
-  babyInfo: { babyName: "콩콩이", dueDate: "", motherName: "", fatherName: "", firstFoundDate: "", firstFeeling: "", firstLetter: "", introCompleted: false, coverMood: "사랑", coverBg: "garden", coverChar: "family", coverActivity: "태담" },
+  babyInfo: { babyName: "", babyNamePromptDone: false, dueDate: "", motherName: "", fatherName: "", firstFoundDate: "", firstFeeling: "", firstLetter: "", introCompleted: false, coverMood: "사랑", coverBg: "garden", coverChar: "family", coverActivity: "태담" },
   dailyRecords: [], activityRecords: [], hospitalRecords: [],
   checklistItems: [{ id: uid(), text: "출산 가방 준비하기", done: false }, { id: uid(), text: "아기 옷 세탁하기", done: false }, { id: uid(), text: "산후조리 계획 세우기", done: false }],
   bucketListItems: [{ id: uid(), text: "아기에게 첫 편지 쓰기", done: false }, { id: uid(), text: "부부가 함께 만삭 사진 찍기", done: false }]
@@ -294,6 +294,96 @@ function SceneWizard({ scene, onChange, title = "그림 만들기" }) {
   return <div className="scene-editor"><SceneComposer {...scene} editable onEdit={reset}/><div className="selected-summary"><span>{getMood(scene.mood).emoji} {getMood(scene.mood).label}</span><span>{BACKGROUNDS.find(b => b.id === scene.bg)?.emoji} {BACKGROUNDS.find(b => b.id === scene.bg)?.label}</span><span>{CHARACTERS.find(c => c.id === scene.character)?.emoji} {CHARACTERS.find(c => c.id === scene.character)?.label}</span><span>{getActivity(scene.activity).emoji} {getActivity(scene.activity).label}</span></div>{open && <div className="wizard-backdrop"><section className="wizard"><div className="wizard-head"><div><strong>{title}</strong><p>{step + 1} / {steps.length}</p></div><button type="button" onClick={() => setOpen(false)}>×</button></div><div className="progress"><span style={{ width: `${((step + 1) / steps.length) * 100}%` }} /></div><h3>{current.title}</h3><p className="muted-text">{current.sub}</p><div className="choice-grid">{current.list.map((item) => <button type="button" key={item.id} className={scene[current.key] === item.id ? "choice on" : "choice"} onClick={() => select(item.id)}><span>{item.emoji}</span>{item.label}</button>)}</div><div className="wizard-actions"><button type="button" className="ghost" disabled={step === 0} onClick={() => setStep((v) => Math.max(0, v - 1))}>이전</button>{step < steps.length - 1 ? <button type="button" className="primary" onClick={() => setStep((v) => v + 1)}>Next</button> : <button type="button" className="primary" onClick={() => setOpen(false)}>완료</button>}</div></section></div>}</div>;
 }
 
+
+function BabyNamePopup({ data, setData }) {
+  const shouldOpen = !data.babyInfo?.babyNamePromptDone;
+  const [name, setName] = useState(data.babyInfo?.babyName || "");
+
+  if (!shouldOpen) return null;
+
+  const close = (value) => {
+    setData((p) => ({
+      ...p,
+      babyInfo: {
+        ...p.babyInfo,
+        babyName: value.trim() || p.babyInfo.babyName || "",
+        babyNamePromptDone: true
+      }
+    }));
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 18,
+        background: "rgba(28, 22, 42, .42)",
+        backdropFilter: "blur(8px)"
+      }}
+    >
+      <section
+        style={{
+          width: "min(92vw, 380px)",
+          borderRadius: 28,
+          padding: "26px 22px 22px",
+          background: "rgba(255, 255, 255, .96)",
+          boxShadow: "0 24px 70px rgba(60, 39, 78, .24)",
+          border: "1px solid rgba(255,255,255,.7)",
+          textAlign: "center"
+        }}
+      >
+        <div style={{ fontSize: 36, marginBottom: 8 }}>👶</div>
+        <h2 style={{ margin: "0 0 8px", fontSize: 22, color: "#3f3344" }}>아기의 태명을 알려주세요</h2>
+        <p style={{ margin: "0 0 18px", fontSize: 14, lineHeight: 1.55, color: "#7b7080" }}>
+          입력한 태명은 홈 화면과 태교북 제목에 사용돼요. 나중에 Chapter 1에서 다시 수정할 수 있어요.
+        </p>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="예: 콩콩이, 찰떡이"
+          autoFocus
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            border: "1px solid #eadfea",
+            borderRadius: 18,
+            padding: "15px 16px",
+            fontSize: 16,
+            outline: "none",
+            textAlign: "center",
+            background: "#fffafd",
+            color: "#3f3344"
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") close(name);
+          }}
+        />
+        <button
+          type="button"
+          className="primary"
+          style={{ width: "100%", marginTop: 14 }}
+          onClick={() => close(name)}
+        >
+          태명 저장하기
+        </button>
+        <button
+          type="button"
+          className="ghost"
+          style={{ width: "100%", marginTop: 8 }}
+          onClick={() => close("")}
+        >
+          나중에 정할게요
+        </button>
+      </section>
+    </div>
+  );
+}
+
 function Header({ data }) { return <header className="topbar"><div><p>Mobile Taegyo Book</p><h1>{data.babyInfo.babyName || "우리 아기"}의 태교북</h1></div><span>{getMood(data.babyInfo.coverMood).emoji}</span></header>; }
 function Home({ data, setTab, setWriteTab }) {
   const b = data.babyInfo;
@@ -365,5 +455,5 @@ export default function App() {
   };
   const mood = getMood(data.babyInfo.coverMood);
   const bgStyle = { "--app-a": mood.sky[0], "--app-b": mood.sky[1], "--app-c": `${mood.accent}33`, "--accent": mood.accent, "--deep": mood.deep };
-  return <div className="app-shell" style={bgStyle}><div className="ambient"/><div className="app"><Header data={data}/>{tab === "home" && <Home data={data} setTab={setTab} setWriteTab={setWriteTab}/>} {tab === "write" && <Write data={data} setData={setData} writeTab={writeTab} setWriteTab={setWriteTab} setTab={setTab}/>} {tab === "book" && <Book data={data} setData={setData}/>} {tab === "settings" && <Settings setData={setData}/>}<nav className="bottom"><button className={tab === "home" ? "on" : ""} onClick={() => setTab("home")}><span>🏠</span>홈</button><button className={tab === "write" ? "on" : ""} onClick={openWrite}><span>✍️</span>기록</button><button className={tab === "book" ? "on" : ""} onClick={() => setTab("book")}><span>📖</span>태교북</button><button className={tab === "settings" ? "on" : ""} onClick={() => setTab("settings")}><span>⚙️</span>설정</button></nav></div></div>;
+  return <div className="app-shell" style={bgStyle}><div className="ambient"/><BabyNamePopup data={data} setData={setData}/><div className="app"><Header data={data}/>{tab === "home" && <Home data={data} setTab={setTab} setWriteTab={setWriteTab}/>} {tab === "write" && <Write data={data} setData={setData} writeTab={writeTab} setWriteTab={setWriteTab} setTab={setTab}/>} {tab === "book" && <Book data={data} setData={setData}/>} {tab === "settings" && <Settings setData={setData}/>}<nav className="bottom"><button className={tab === "home" ? "on" : ""} onClick={() => setTab("home")}><span>🏠</span>홈</button><button className={tab === "write" ? "on" : ""} onClick={openWrite}><span>✍️</span>기록</button><button className={tab === "book" ? "on" : ""} onClick={() => setTab("book")}><span>📖</span>태교북</button><button className={tab === "settings" ? "on" : ""} onClick={() => setTab("settings")}><span>⚙️</span>설정</button></nav></div></div>;
 }
