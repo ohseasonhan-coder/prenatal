@@ -194,13 +194,13 @@ function FamilyIllustration({ character, mood }) {
 
   if (characterSrc) {
     return (
-      <g transform="translate(0 -24)">
+      <g transform="translate(0 -26)">
         <image
           href={characterSrc}
-          x="70"
-          y="14"
-          width="280"
-          height="192"
+          x="58"
+          y="4"
+          width="304"
+          height="208"
           preserveAspectRatio="xMidYMid meet"
         />
       </g>
@@ -245,13 +245,13 @@ function ActivityLayer({ activity, mood }) {
   if (activitySrc) {
     return (
       <g>
-        <ellipse cx="210" cy="252" rx="178" ry="18" fill="#000" opacity=".045" />
+        <ellipse cx="210" cy="244" rx="190" ry="18" fill="#000" opacity=".045" />
         <image
           href={activitySrc}
-          x="35"
-          y="145"
-          width="350"
-          height="122"
+          x="20"
+          y="118"
+          width="380"
+          height="146"
           preserveAspectRatio="xMidYMax meet"
         />
       </g>
