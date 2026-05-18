@@ -88,13 +88,22 @@ const ACTIVITIES = [
 ];
 
 const INITIAL = {
-  babyInfo: { babyName: "콩콩이", dueDate: "", motherName: "", fatherName: "", firstFoundDate: "", firstFeeling: "", firstLetter: "", coverMood: "사랑", coverBg: "garden", coverChar: "family", coverActivity: "태담" },
+  babyInfo: { babyName: "콩콩이", dueDate: "", motherName: "", fatherName: "", firstFoundDate: "", firstFeeling: "", firstLetter: "", introCompleted: false, coverMood: "사랑", coverBg: "garden", coverChar: "family", coverActivity: "태담" },
   dailyRecords: [], activityRecords: [], hospitalRecords: [],
   checklistItems: [{ id: uid(), text: "출산 가방 준비하기", done: false }, { id: uid(), text: "아기 옷 세탁하기", done: false }, { id: uid(), text: "산후조리 계획 세우기", done: false }],
   bucketListItems: [{ id: uid(), text: "아기에게 첫 편지 쓰기", done: false }, { id: uid(), text: "부부가 함께 만삭 사진 찍기", done: false }]
 };
 const getMood = (id) => MOODS.find((m) => m.id === id) || MOODS[0];
 const getActivity = (id) => ACTIVITIES.find((a) => a.id === id) || ACTIVITIES[0];
+const isIntroWritten = (babyInfo = {}) => Boolean(
+  babyInfo.introCompleted ||
+  babyInfo.dueDate ||
+  babyInfo.motherName ||
+  babyInfo.fatherName ||
+  babyInfo.firstFoundDate ||
+  babyInfo.firstFeeling ||
+  babyInfo.firstLetter
+);
 
 const CHARACTER_ASSETS = {
   family: familyPng,
@@ -185,13 +194,13 @@ function FamilyIllustration({ character, mood }) {
 
   if (characterSrc) {
     return (
-      <g transform="translate(0 -24)">
+      <g transform="translate(0 -26)">
         <image
           href={characterSrc}
-          x="60"
-          y="14"
-          width="300"
-          height="206"
+          x="80"
+          y="20"
+          width="260"
+          height="178"
           preserveAspectRatio="xMidYMid meet"
         />
       </g>
@@ -236,13 +245,13 @@ function ActivityLayer({ activity, mood }) {
   if (activitySrc) {
     return (
       <g>
-        <ellipse cx="210" cy="252" rx="154" ry="17" fill="#000" opacity=".045" />
+        <ellipse cx="210" cy="252" rx="178" ry="18" fill="#000" opacity=".045" />
         <image
           href={activitySrc}
-          x="60"
-          y="158"
-          width="300"
-          height="106"
+          x="35"
+          y="145"
+          width="350"
+          height="122"
           preserveAspectRatio="xMidYMax meet"
         />
       </g>
@@ -290,10 +299,15 @@ function Home({ data, setTab, setWriteTab }) {
   const b = data.babyInfo;
   return <main className="screen"><section className="hero card"><SceneComposer mood={b.coverMood} bg={b.coverBg} character={b.coverChar} activity={b.coverActivity}/><div className="hero-copy"><h2>{b.babyName || "우리 아기"}를 기다리는 그림일기</h2><p>기분, 배경, 인물, 태교 활동을 순서대로 골라 기록하는 모바일 태교북입니다.</p></div></section><section className="quick-grid">{[["✍️", "오늘 기록", "daily"], ["🌿", "태교 활동", "activity"], ["🏥", "병원 기록", "hospital"], ["📦", "출산 준비", "prepare"]].map(([icon, label, tab]) => <button key={tab} className="quick" onClick={() => { setWriteTab(tab); setTab("write"); }}><span>{icon}</span>{label}</button>)}</section><section className="card pad"><div className="section-head"><h3>기록 현황</h3><p>커버 그림 바꾸기는 제외했고, 기록 작성 화면에서만 연필 버튼으로 그림을 수정합니다.</p></div><div className="stats"><div><strong>{data.dailyRecords.length}</strong><span>주차 기록</span></div><div><strong>{data.activityRecords.length}</strong><span>활동 기록</span></div><div><strong>{data.hospitalRecords.length}</strong><span>병원 기록</span></div></div></section></main>;
 }
-function IntroForm({ data, setData }) {
+function IntroForm({ data, setData, setWriteTab }) {
   const b = data.babyInfo;
+  const completed = isIntroWritten(b);
   const update = (key, value) => setData((p) => ({ ...p, babyInfo: { ...p.babyInfo, [key]: value } }));
-  return <div className="card pad"><h2 className="form-title">Chapter 1. 우리 아기를 기다리며</h2><label>태명<input value={b.babyName} onChange={(e) => update("babyName", e.target.value)} /></label><label>출산 예정일<input type="date" value={b.dueDate} onChange={(e) => update("dueDate", e.target.value)} /></label><div className="two"><label>엄마 이름<input value={b.motherName} onChange={(e) => update("motherName", e.target.value)} /></label><label>아빠 이름<input value={b.fatherName} onChange={(e) => update("fatherName", e.target.value)} /></label></div><label>처음 알게 된 날<input type="date" value={b.firstFoundDate} onChange={(e) => update("firstFoundDate", e.target.value)} /></label><label>처음 느낀 마음<textarea value={b.firstFeeling} onChange={(e) => update("firstFeeling", e.target.value)} /></label><label>아기에게 첫 편지<textarea value={b.firstLetter} onChange={(e) => update("firstLetter", e.target.value)} /></label></div>;
+  const finishIntro = () => {
+    setData((p) => ({ ...p, babyInfo: { ...p.babyInfo, introCompleted: true } }));
+    setWriteTab("daily");
+  };
+  return <div className="card pad"><h2 className="form-title">Chapter 1. 우리 아기를 기다리며</h2><p className="muted-text">{completed ? "첫 이야기는 저장되어 있어요. 필요한 부분만 수정한 뒤 완료를 눌러주세요." : "처음 접속했을 때만 기본 정보를 작성하고, 이후에는 수정용으로만 사용됩니다."}</p><label>태명<input value={b.babyName} onChange={(e) => update("babyName", e.target.value)} /></label><label>출산 예정일<input type="date" value={b.dueDate} onChange={(e) => update("dueDate", e.target.value)} /></label><div className="two"><label>엄마 이름<input value={b.motherName} onChange={(e) => update("motherName", e.target.value)} /></label><label>아빠 이름<input value={b.fatherName} onChange={(e) => update("fatherName", e.target.value)} /></label></div><label>처음 알게 된 날<input type="date" value={b.firstFoundDate} onChange={(e) => update("firstFoundDate", e.target.value)} /></label><label>처음 느낀 마음<textarea value={b.firstFeeling} onChange={(e) => update("firstFeeling", e.target.value)} /></label><label>아기에게 첫 편지<textarea value={b.firstLetter} onChange={(e) => update("firstLetter", e.target.value)} /></label><button className="primary" onClick={finishIntro}>{completed ? "수정 완료" : "첫 이야기 저장하기"}</button></div>;
 }
 function DailyForm({ setData, setTab }) {
   const [scene, setScene] = useState({ mood: "사랑", bg: "garden", character: "family", activity: "태담" });
@@ -324,8 +338,9 @@ function PrepareForm({ data, setData }) {
   return <div className="card pad"><h2 className="form-title">Chapter 5. 출산 준비 & 버킷리스트</h2><div className="add"><input value={text} onChange={(e) => setText(e.target.value)} placeholder="준비할 것 추가"/><button onClick={() => add("checklistItems", text, setText)}>추가</button></div><List title="출산 준비 체크리스트" items={data.checklistItems} type="checklistItems"/><div className="add"><input value={bucket} onChange={(e) => setBucket(e.target.value)} placeholder="하고 싶은 일 추가"/><button onClick={() => add("bucketListItems", bucket, setBucket)}>추가</button></div><List title="출산 전 버킷리스트" items={data.bucketListItems} type="bucketListItems"/></div>;
 }
 function Write({ data, setData, writeTab, setWriteTab, setTab }) {
-  const tabs = [{ id: "intro", label: "첫 이야기" }, { id: "daily", label: "주차 기록" }, { id: "activity", label: "태교 활동" }, { id: "hospital", label: "병원" }, { id: "prepare", label: "준비" }];
-  return <main className="screen"><div className="tabs">{tabs.map((t) => <button key={t.id} className={writeTab === t.id ? "on" : ""} onClick={() => setWriteTab(t.id)}>{t.label}</button>)}</div>{writeTab === "intro" && <IntroForm data={data} setData={setData}/>} {writeTab === "daily" && <DailyForm setData={setData} setTab={setTab}/>} {writeTab === "activity" && <ActivityForm setData={setData} setTab={setTab}/>} {writeTab === "hospital" && <HospitalForm setData={setData} setTab={setTab}/>} {writeTab === "prepare" && <PrepareForm data={data} setData={setData}/>}</main>;
+  const introDone = isIntroWritten(data.babyInfo);
+  const tabs = [{ id: "intro", label: introDone ? "첫 이야기 수정" : "첫 이야기" }, { id: "daily", label: "주차 기록" }, { id: "activity", label: "태교 활동" }, { id: "hospital", label: "병원" }, { id: "prepare", label: "준비" }];
+  return <main className="screen"><div className="tabs">{tabs.map((t) => <button key={t.id} className={writeTab === t.id ? "on" : ""} onClick={() => setWriteTab(t.id)}>{t.label}</button>)}</div>{writeTab === "intro" && <IntroForm data={data} setData={setData} setWriteTab={setWriteTab}/>} {writeTab === "daily" && <DailyForm setData={setData} setTab={setTab}/>} {writeTab === "activity" && <ActivityForm setData={setData} setTab={setTab}/>} {writeTab === "hospital" && <HospitalForm setData={setData} setTab={setTab}/>} {writeTab === "prepare" && <PrepareForm data={data} setData={setData}/>}</main>;
 }
 function Book({ data, setData }) {
   const remove = (key, id) => setData((p) => ({ ...p, [key]: p[key].filter((item) => item.id !== id) }));
@@ -340,8 +355,15 @@ function Settings({ setData }) {
 export default function App() {
   const [data, setData] = usePlanner();
   const [tab, setTab] = useState("home");
-  const [writeTab, setWriteTab] = useState("intro");
+  const [writeTab, setWriteTab] = useState(() => isIntroWritten(data.babyInfo) ? "daily" : "intro");
+  useEffect(() => {
+    if (writeTab === "intro" && isIntroWritten(data.babyInfo)) setWriteTab("daily");
+  }, []);
+  const openWrite = () => {
+    setWriteTab(isIntroWritten(data.babyInfo) ? "daily" : "intro");
+    setTab("write");
+  };
   const mood = getMood(data.babyInfo.coverMood);
   const bgStyle = { "--app-a": mood.sky[0], "--app-b": mood.sky[1], "--app-c": `${mood.accent}33`, "--accent": mood.accent, "--deep": mood.deep };
-  return <div className="app-shell" style={bgStyle}><div className="ambient"/><div className="app"><Header data={data}/>{tab === "home" && <Home data={data} setTab={setTab} setWriteTab={setWriteTab}/>} {tab === "write" && <Write data={data} setData={setData} writeTab={writeTab} setWriteTab={setWriteTab} setTab={setTab}/>} {tab === "book" && <Book data={data} setData={setData}/>} {tab === "settings" && <Settings setData={setData}/>}<nav className="bottom"><button className={tab === "home" ? "on" : ""} onClick={() => setTab("home")}><span>🏠</span>홈</button><button className={tab === "write" ? "on" : ""} onClick={() => setTab("write")}><span>✍️</span>기록</button><button className={tab === "book" ? "on" : ""} onClick={() => setTab("book")}><span>📖</span>태교북</button><button className={tab === "settings" ? "on" : ""} onClick={() => setTab("settings")}><span>⚙️</span>설정</button></nav></div></div>;
+  return <div className="app-shell" style={bgStyle}><div className="ambient"/><div className="app"><Header data={data}/>{tab === "home" && <Home data={data} setTab={setTab} setWriteTab={setWriteTab}/>} {tab === "write" && <Write data={data} setData={setData} writeTab={writeTab} setWriteTab={setWriteTab} setTab={setTab}/>} {tab === "book" && <Book data={data} setData={setData}/>} {tab === "settings" && <Settings setData={setData}/>}<nav className="bottom"><button className={tab === "home" ? "on" : ""} onClick={() => setTab("home")}><span>🏠</span>홈</button><button className={tab === "write" ? "on" : ""} onClick={openWrite}><span>✍️</span>기록</button><button className={tab === "book" ? "on" : ""} onClick={() => setTab("book")}><span>📖</span>태교북</button><button className={tab === "settings" ? "on" : ""} onClick={() => setTab("settings")}><span>⚙️</span>설정</button></nav></div></div>;
 }
