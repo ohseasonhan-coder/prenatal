@@ -229,34 +229,28 @@ function ActivityLayer({ activity, mood }) {
   const m = getMood(mood);
   const activitySrc = ACTIVITY_ASSETS[activity];
 
+  // activities 폴더의 PNG는 우측 작은 아이콘이 아니라
+  // 장면의 하단 오브젝트처럼 크게 보이도록 배치합니다.
   if (activitySrc) {
     return (
-      <g transform="translate(304 34)">
-        <rect
-          x="-8"
-          y="-8"
-          width="86"
-          height="86"
-          rx="28"
-          fill="#fff"
-          opacity=".88"
-        />
+      <g>
+        <ellipse cx="210" cy="234" rx="132" ry="18" fill="#000" opacity=".055" />
         <image
           href={activitySrc}
-          x="0"
-          y="0"
-          width="70"
-          height="70"
-          preserveAspectRatio="xMidYMid meet"
+          x="85"
+          y="128"
+          width="250"
+          height="118"
+          preserveAspectRatio="xMidYMax meet"
         />
       </g>
     );
   }
 
   return (
-    <g transform="translate(333 78)">
-      <rect x="-34" y="-22" width="68" height="44" rx="22" fill="#fff" opacity=".9" />
-      <text x="0" y="10" textAnchor="middle" fontSize="27" fill={m.deep}>
+    <g transform="translate(210 210)">
+      <rect x="-54" y="-34" width="108" height="58" rx="28" fill="#fff" opacity=".88" />
+      <text x="0" y="8" textAnchor="middle" fontSize="34" fill={m.deep}>
         {a.emoji}
       </text>
     </g>
@@ -266,7 +260,7 @@ function ActivityLayer({ activity, mood }) {
 function SceneComposer({ mood = "사랑", bg = "garden", character = "family", activity = "태담", small = false, editable = false, onEdit }) {
   const m = getMood(mood);
   const gradId = useMemo(() => `grad-${uid().replace(/[^a-zA-Z0-9]/g, "")}`, []);
-  return <div className={`scene ${small ? "scene-small" : ""}`}><svg viewBox="0 0 420 260" role="img" aria-label="태교 일러스트"><defs><linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={m.sky[0]}/><stop offset="100%" stopColor={m.sky[1]}/></linearGradient></defs><g><rect width="420" height="260" fill={`url(#${gradId})`}/><BackgroundLayer bg={bg} mood={mood}/><path d="M210 70 C255 10 358 40 360 116 C362 185 286 214 210 235 C134 214 58 185 60 116 C62 40 165 10 210 70 Z" fill={m.accent} opacity=".42"/><LeafDecor mood={mood}/><MoodFx mood={mood}/><ActivityLayer activity={activity} mood={mood}/><FamilyIllustration character={character} mood={mood}/></g></svg>{editable && <button className="edit-float" type="button" onClick={onEdit} aria-label="그림 수정">✏️</button>}</div>;
+  return <div className={`scene ${small ? "scene-small" : ""}`}><svg viewBox="0 0 420 260" role="img" aria-label="태교 일러스트"><defs><linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={m.sky[0]}/><stop offset="100%" stopColor={m.sky[1]}/></linearGradient></defs><g><rect width="420" height="260" fill={`url(#${gradId})`}/><BackgroundLayer bg={bg} mood={mood}/><path d="M210 70 C255 10 358 40 360 116 C362 185 286 214 210 235 C134 214 58 185 60 116 C62 40 165 10 210 70 Z" fill={m.accent} opacity=".42"/><LeafDecor mood={mood}/><MoodFx mood={mood}/><FamilyIllustration character={character} mood={mood}/><ActivityLayer activity={activity} mood={mood}/></g></svg>{editable && <button className="edit-float" type="button" onClick={onEdit} aria-label="그림 수정">✏️</button>}</div>;
 }
 function PhotoSlot({ photo, onPhoto, onRemove, small = false }) {
   const { ref, trigger, onChange } = usePhotoUpload(onPhoto);
