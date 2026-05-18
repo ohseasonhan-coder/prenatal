@@ -185,13 +185,13 @@ function FamilyIllustration({ character, mood }) {
 
   if (characterSrc) {
     return (
-      <g transform="translate(0 -18)">
+      <g transform="translate(0 -24)">
         <image
           href={characterSrc}
-          x="48"
-          y="10"
-          width="324"
-          height="222"
+          x="60"
+          y="14"
+          width="300"
+          height="206"
           preserveAspectRatio="xMidYMid meet"
         />
       </g>
@@ -236,13 +236,13 @@ function ActivityLayer({ activity, mood }) {
   if (activitySrc) {
     return (
       <g>
-        <ellipse cx="210" cy="247" rx="136" ry="16" fill="#000" opacity=".045" />
+        <ellipse cx="210" cy="252" rx="154" ry="17" fill="#000" opacity=".045" />
         <image
           href={activitySrc}
-          x="80"
-          y="166"
-          width="260"
-          height="92"
+          x="60"
+          y="158"
+          width="300"
+          height="106"
           preserveAspectRatio="xMidYMax meet"
         />
       </g>
@@ -262,7 +262,7 @@ function ActivityLayer({ activity, mood }) {
 function SceneComposer({ mood = "사랑", bg = "garden", character = "family", activity = "태담", small = false, editable = false, onEdit }) {
   const m = getMood(mood);
   const gradId = useMemo(() => `grad-${uid().replace(/[^a-zA-Z0-9]/g, "")}`, []);
-  return <div className={`scene ${small ? "scene-small" : ""}`}><svg viewBox="0 0 420 260" role="img" aria-label="태교 일러스트"><defs><linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={m.sky[0]}/><stop offset="100%" stopColor={m.sky[1]}/></linearGradient></defs><g><rect width="420" height="260" fill={`url(#${gradId})`}/><BackgroundLayer bg={bg} mood={mood}/><path d="M210 70 C255 10 358 40 360 116 C362 185 286 214 210 235 C134 214 58 185 60 116 C62 40 165 10 210 70 Z" fill={m.accent} opacity=".42"/><LeafDecor mood={mood}/><MoodFx mood={mood}/><ActivityLayer activity={activity} mood={mood}/><FamilyIllustration character={character} mood={mood}/></g></svg>{editable && <button className="edit-float" type="button" onClick={onEdit} aria-label="그림 수정">✏️</button>}</div>;
+  return <div className={`scene ${small ? "scene-small" : ""}`}><svg viewBox="0 0 420 260" role="img" aria-label="태교 일러스트"><defs><linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={m.sky[0]}/><stop offset="100%" stopColor={m.sky[1]}/></linearGradient></defs><g><rect width="420" height="260" fill={`url(#${gradId})`}/><BackgroundLayer bg={bg} mood={mood}/><path d="M210 70 C255 10 358 40 360 116 C362 185 286 214 210 235 C134 214 58 185 60 116 C62 40 165 10 210 70 Z" fill={m.accent} opacity=".42"/><LeafDecor mood={mood}/><MoodFx mood={mood}/><FamilyIllustration character={character} mood={mood}/><ActivityLayer activity={activity} mood={mood}/></g></svg>{editable && <button className="edit-float" type="button" onClick={onEdit} aria-label="그림 수정">✏️</button>}</div>;
 }
 function PhotoSlot({ photo, onPhoto, onRemove, small = false }) {
   const { ref, trigger, onChange } = usePhotoUpload(onPhoto);
