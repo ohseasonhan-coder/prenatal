@@ -236,13 +236,13 @@ function ActivityLayer({ activity, mood }) {
   if (activitySrc) {
     return (
       <g>
-        <ellipse cx="210" cy="240" rx="118" ry="14" fill="#000" opacity=".045" />
+        <ellipse cx="210" cy="247" rx="136" ry="16" fill="#000" opacity=".045" />
         <image
           href={activitySrc}
-          x="98"
-          y="158"
-          width="224"
-          height="86"
+          x="80"
+          y="166"
+          width="260"
+          height="92"
           preserveAspectRatio="xMidYMax meet"
         />
       </g>
