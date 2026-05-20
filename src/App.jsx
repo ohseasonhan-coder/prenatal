@@ -165,6 +165,26 @@ const ACTIVITY_ASSETS = {
   기도: prayerPng
 };
 
+const ACTIVITY_CROPS = {
+  태담: { x: 0, y: 0, w: 1503, h: 1023 },
+  음악: { x: 12, y: 1, w: 1492, h: 1022 },
+  독서: { x: 52, y: 3, w: 1460, h: 1020 },
+  그림: { x: 12, y: 0, w: 1462, h: 1023 },
+  요리: { x: 12, y: 0, w: 1511, h: 1023 },
+  휴식: { x: 63, y: 3, w: 1434, h: 1020 },
+  운동: { x: 14, y: 0, w: 1483, h: 1022 },
+  태교음악: { x: 12, y: 1, w: 1445, h: 1022 },
+  편지: { x: 14, y: 5, w: 1381, h: 1017 },
+  뜨개질: { x: 14, y: 7, w: 1464, h: 1015 },
+  목욕: { x: 3, y: 0, w: 1533, h: 1022 },
+  요가: { x: 12, y: 3, w: 1492, h: 1020 },
+  초음파: { x: 12, y: 3, w: 1509, h: 1020 },
+  아기방: { x: 12, y: 3, w: 1513, h: 1020 },
+  쇼핑: { x: 12, y: 3, w: 1509, h: 1020 },
+  피크닉: { x: 0, y: 1, w: 1536, h: 1021 },
+  기도: { x: 14, y: 1, w: 1412, h: 1021 }
+};
+
 function usePlanner() {
   const [data, setData] = useState(() => {
     try {
@@ -282,21 +302,32 @@ function ActivityLayer({ activity, mood }) {
   const a = getActivity(activity);
   const m = getMood(mood);
   const activitySrc = ACTIVITY_ASSETS[activity];
+  const crop = ACTIVITY_CROPS[activity] || ACTIVITY_CROPS["운동"];
 
-  // activities 폴더의 PNG는 우측 작은 아이콘이 아니라
-  // 장면의 하단 오브젝트처럼 크게 보이도록 배치합니다.
+  // 모든 activity PNG를 운동 이미지와 비슷한 체감 크기로 맞추기 위해
+  // 투명 여백을 viewBox로 잘라낸 뒤 같은 박스에 배치합니다.
   if (activitySrc) {
     return (
       <g>
-        <ellipse cx="210" cy="244" rx="190" ry="18" fill="#000" opacity=".045" />
-        <image
-          href={activitySrc}
-          x="20"
-          y="118"
-          width="380"
-          height="146"
-          preserveAspectRatio="xMidYMax meet"
-        />
+        <ellipse cx="210" cy="246" rx="176" ry="17" fill="#000" opacity=".045" />
+        <svg
+          x="64"
+          y="92"
+          width="292"
+          height="202"
+          viewBox={`${crop.x} ${crop.y} ${crop.w} ${crop.h}`}
+          preserveAspectRatio="xMidYMid meet"
+          overflow="visible"
+        >
+          <image
+            href={activitySrc}
+            x="0"
+            y="0"
+            width="1536"
+            height="1024"
+            preserveAspectRatio="xMidYMid meet"
+          />
+        </svg>
       </g>
     );
   }
@@ -311,10 +342,10 @@ function ActivityLayer({ activity, mood }) {
   );
 }
 
-function SceneComposer({ mood = "사랑", bg = "garden", character = "family", activity = "태담", small = false, editable = false, onEdit }) {
+function SceneComposer({ mood = "사랑", bg = "garden", character = "family", activity = "태담", small = false, large = false, editable = false, onEdit }) {
   const m = getMood(mood);
   const gradId = useMemo(() => `grad-${uid().replace(/[^a-zA-Z0-9]/g, "")}`, []);
-  return <div className={`scene ${small ? "scene-small" : ""}`}><svg viewBox="0 0 420 260" role="img" aria-label="태교 일러스트"><defs><linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={m.sky[0]}/><stop offset="100%" stopColor={m.sky[1]}/></linearGradient></defs><g><rect width="420" height="260" fill={`url(#${gradId})`}/><BackgroundLayer bg={bg} mood={mood}/><path d="M210 70 C255 10 358 40 360 116 C362 185 286 214 210 235 C134 214 58 185 60 116 C62 40 165 10 210 70 Z" fill={m.accent} opacity=".42"/><LeafDecor mood={mood}/><MoodFx mood={mood}/><FamilyIllustration character={character} mood={mood}/><ActivityLayer activity={activity} mood={mood}/></g></svg>{editable && <button className="edit-float" type="button" onClick={onEdit} aria-label="그림 수정">✏️</button>}</div>;
+  return <div className={`scene ${small ? "scene-small" : ""} ${large ? "scene-large" : ""}`}><svg viewBox="0 0 420 260" role="img" aria-label="태교 일러스트"><defs><linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={m.sky[0]}/><stop offset="100%" stopColor={m.sky[1]}/></linearGradient></defs><g><rect width="420" height="260" fill={`url(#${gradId})`}/><BackgroundLayer bg={bg} mood={mood}/><path d="M210 70 C255 10 358 40 360 116 C362 185 286 214 210 235 C134 214 58 185 60 116 C62 40 165 10 210 70 Z" fill={m.accent} opacity=".42"/><LeafDecor mood={mood}/><MoodFx mood={mood}/><FamilyIllustration character={character} mood={mood}/><ActivityLayer activity={activity} mood={mood}/></g></svg>{editable && <button className="edit-float" type="button" onClick={onEdit} aria-label="그림 수정">✏️</button>}</div>;
 }
 function PhotoSlot({ photo, onPhoto, onRemove, small = false }) {
   const { ref, trigger, onChange } = usePhotoUpload(onPhoto);
@@ -344,7 +375,7 @@ function SceneWizard({ scene, onChange, title = "그림 만들기" }) {
     }
   };
   const reset = () => { setStep(0); setOpen(true); };
-  return <div className="scene-editor"><SceneComposer {...scene} editable onEdit={reset}/><div className="selected-summary"><span>{getMood(scene.mood).emoji} {getMood(scene.mood).label}</span><span>{BACKGROUNDS.find(b => b.id === scene.bg)?.emoji} {BACKGROUNDS.find(b => b.id === scene.bg)?.label}</span><span>{CHARACTERS.find(c => c.id === scene.character)?.emoji} {CHARACTERS.find(c => c.id === scene.character)?.label}</span><span>{getActivity(scene.activity).emoji} {getActivity(scene.activity).label}</span></div>{open && <div className="wizard-backdrop"><section className="wizard"><div className="wizard-head"><div><strong>{title}</strong><p>{step + 1} / {steps.length}</p></div><button type="button" onClick={() => setOpen(false)}>×</button></div><div className="progress"><span style={{ width: `${((step + 1) / steps.length) * 100}%` }} /></div><h3>{current.title}</h3><p className="muted-text">{current.sub}</p><div className="choice-grid">{current.list.map((item) => <button type="button" key={item.id} className={scene[current.key] === item.id ? "choice on" : "choice"} onClick={() => select(item.id)}><span>{item.emoji}</span>{item.label}</button>)}</div><div className="wizard-actions wizard-actions-prev-only"><button type="button" className="ghost" disabled={step === 0} onClick={() => setStep((v) => Math.max(0, v - 1))}>이전</button></div></section></div>}</div>;
+  return <div className="scene-editor"><SceneComposer {...scene} large editable onEdit={reset}/><div className="selected-summary"><span>{getMood(scene.mood).emoji} {getMood(scene.mood).label}</span><span>{BACKGROUNDS.find(b => b.id === scene.bg)?.emoji} {BACKGROUNDS.find(b => b.id === scene.bg)?.label}</span><span>{CHARACTERS.find(c => c.id === scene.character)?.emoji} {CHARACTERS.find(c => c.id === scene.character)?.label}</span><span>{getActivity(scene.activity).emoji} {getActivity(scene.activity).label}</span></div>{open && <div className="wizard-backdrop"><section className="wizard"><div className="wizard-head"><div><strong>{title}</strong><p>{step + 1} / {steps.length}</p></div><button type="button" onClick={() => setOpen(false)}>×</button></div><div className="progress"><span style={{ width: `${((step + 1) / steps.length) * 100}%` }} /></div><h3>{current.title}</h3><p className="muted-text">{current.sub}</p><div className="choice-grid">{current.list.map((item) => <button type="button" key={item.id} className={scene[current.key] === item.id ? "choice on" : "choice"} onClick={() => select(item.id)}><span>{item.emoji}</span>{item.label}</button>)}</div><div className="wizard-actions wizard-actions-prev-only"><button type="button" className="ghost" disabled={step === 0} onClick={() => setStep((v) => Math.max(0, v - 1))}>이전</button></div></section></div>}</div>;
 }
 
 
