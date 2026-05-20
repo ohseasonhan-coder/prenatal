@@ -332,9 +332,19 @@ function SceneWizard({ scene, onChange, title = "그림 만들기" }) {
     { key: "activity", title: "태교 활동을 선택해요", sub: "오늘의 활동을 그림에 넣어요.", list: ACTIVITIES }
   ];
   const current = steps[step];
-  const select = (id) => onChange({ ...scene, [current.key]: id });
+  const select = (id) => {
+    onChange({ ...scene, [current.key]: id });
+
+    // 선택 즉시 다음 단계로 이동합니다.
+    // 마지막 단계인 활동 선택까지 끝나면 팝업을 닫습니다.
+    if (step < steps.length - 1) {
+      setStep((v) => Math.min(steps.length - 1, v + 1));
+    } else {
+      setOpen(false);
+    }
+  };
   const reset = () => { setStep(0); setOpen(true); };
-  return <div className="scene-editor"><SceneComposer {...scene} editable onEdit={reset}/><div className="selected-summary"><span>{getMood(scene.mood).emoji} {getMood(scene.mood).label}</span><span>{BACKGROUNDS.find(b => b.id === scene.bg)?.emoji} {BACKGROUNDS.find(b => b.id === scene.bg)?.label}</span><span>{CHARACTERS.find(c => c.id === scene.character)?.emoji} {CHARACTERS.find(c => c.id === scene.character)?.label}</span><span>{getActivity(scene.activity).emoji} {getActivity(scene.activity).label}</span></div>{open && <div className="wizard-backdrop"><section className="wizard"><div className="wizard-head"><div><strong>{title}</strong><p>{step + 1} / {steps.length}</p></div><button type="button" onClick={() => setOpen(false)}>×</button></div><div className="progress"><span style={{ width: `${((step + 1) / steps.length) * 100}%` }} /></div><h3>{current.title}</h3><p className="muted-text">{current.sub}</p><div className="choice-grid">{current.list.map((item) => <button type="button" key={item.id} className={scene[current.key] === item.id ? "choice on" : "choice"} onClick={() => select(item.id)}><span>{item.emoji}</span>{item.label}</button>)}</div><div className="wizard-actions"><button type="button" className="ghost" disabled={step === 0} onClick={() => setStep((v) => Math.max(0, v - 1))}>이전</button>{step < steps.length - 1 ? <button type="button" className="primary" onClick={() => setStep((v) => v + 1)}>Next</button> : <button type="button" className="primary" onClick={() => setOpen(false)}>완료</button>}</div></section></div>}</div>;
+  return <div className="scene-editor"><SceneComposer {...scene} editable onEdit={reset}/><div className="selected-summary"><span>{getMood(scene.mood).emoji} {getMood(scene.mood).label}</span><span>{BACKGROUNDS.find(b => b.id === scene.bg)?.emoji} {BACKGROUNDS.find(b => b.id === scene.bg)?.label}</span><span>{CHARACTERS.find(c => c.id === scene.character)?.emoji} {CHARACTERS.find(c => c.id === scene.character)?.label}</span><span>{getActivity(scene.activity).emoji} {getActivity(scene.activity).label}</span></div>{open && <div className="wizard-backdrop"><section className="wizard"><div className="wizard-head"><div><strong>{title}</strong><p>{step + 1} / {steps.length}</p></div><button type="button" onClick={() => setOpen(false)}>×</button></div><div className="progress"><span style={{ width: `${((step + 1) / steps.length) * 100}%` }} /></div><h3>{current.title}</h3><p className="muted-text">{current.sub}</p><div className="choice-grid">{current.list.map((item) => <button type="button" key={item.id} className={scene[current.key] === item.id ? "choice on" : "choice"} onClick={() => select(item.id)}><span>{item.emoji}</span>{item.label}</button>)}</div><div className="wizard-actions wizard-actions-prev-only"><button type="button" className="ghost" disabled={step === 0} onClick={() => setStep((v) => Math.max(0, v - 1))}>이전</button></div></section></div>}</div>;
 }
 
 
