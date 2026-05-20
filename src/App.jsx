@@ -311,10 +311,10 @@ function ActivityLayer({ activity, mood }) {
       <g>
         <ellipse cx="210" cy="246" rx="176" ry="17" fill="#000" opacity=".045" />
         <svg
-          x="64"
-          y="92"
-          width="292"
-          height="202"
+          x="78"
+          y="120"
+          width="264"
+          height="152"
           viewBox={`${crop.x} ${crop.y} ${crop.w} ${crop.h}`}
           preserveAspectRatio="xMidYMid meet"
           overflow="visible"
