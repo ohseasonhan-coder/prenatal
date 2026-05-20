@@ -228,6 +228,10 @@ function BackgroundLayer({ bg, mood }) {
           height="260"
           preserveAspectRatio="xMidYMid slice"
         />
+        {/* 무드 색상 오버레이: 배경 이미지 전체에 감성 색감을 입혀서 캐릭터·활동 이미지와 톤을 맞춥니다 */}
+        <rect width="420" height="260" fill={m.accent} opacity=".18" />
+        {/* 하단 그라디언트: 캐릭터가 배경에 자연스럽게 놓이도록 바닥을 부드럽게 밝힙니다 */}
+        <rect x="0" y="160" width="420" height="100" fill={m.sky[1]} opacity=".32" />
         <ellipse cx="210" cy="258" rx="245" ry="54" fill="#fff" opacity=".08" />
       </g>
     );
@@ -256,8 +260,19 @@ function FamilyIllustration({ character, mood }) {
   const characterSrc = CHARACTER_ASSETS[character] || CHARACTER_ASSETS.family;
 
   if (characterSrc) {
+    const fadeId = `char-fade-${character}`;
     return (
       <g transform="translate(0 -26)">
+        <defs>
+          <linearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#fff" stopOpacity="1" />
+            <stop offset="68%" stopColor="#fff" stopOpacity="1" />
+            <stop offset="100%" stopColor="#fff" stopOpacity="0" />
+          </linearGradient>
+          <mask id={`mask-${character}`}>
+            <rect x="58" y="4" width="304" height="208" fill={`url(#${fadeId})`} />
+          </mask>
+        </defs>
         <image
           href={characterSrc}
           x="58"
@@ -265,6 +280,7 @@ function FamilyIllustration({ character, mood }) {
           width="304"
           height="208"
           preserveAspectRatio="xMidYMid meet"
+          mask={`url(#mask-${character})`}
         />
       </g>
     );
@@ -498,10 +514,11 @@ function ActivityForm({ setData, setTab }) {
   return <div className="card pad"><h2 className="form-title">Chapter 3. 태교 활동 기록</h2>{form.photo ? <PhotoSlot photo={form.photo} onPhoto={(v) => update("photo", v)} onRemove={() => update("photo", "")} /> : <SceneWizard scene={scene} onChange={setScene} title="활동 그림 수정"/>}<div className="photo-line"><PhotoSlot photo={form.photo} onPhoto={(v) => update("photo", v)} onRemove={() => update("photo", "")} /></div><label>날짜<input type="date" value={form.date} onChange={(e) => update("date", e.target.value)} /></label><label>함께한 사람<input value={form.withWhom} onChange={(e) => update("withWhom", e.target.value)} placeholder="예: 아빠와 함께" /></label><label>오늘의 느낌<textarea value={form.feeling} onChange={(e) => update("feeling", e.target.value)} /></label><label>아기에게 남기는 말<textarea value={form.message} onChange={(e) => update("message", e.target.value)} /></label><button className="primary" onClick={save}>✨ 태교 활동 저장하기</button></div>;
 }
 function HospitalForm({ setData, setTab }) {
+  const [scene, setScene] = useState({ mood: "편안함", bg: "clinic", character: "mama", activity: "초음파" });
   const [form, setForm] = useState({ date: today(), week: "", hospital: "", checkup: "", memo: "", condition: "", nextDate: "", photo: "" });
   const update = (key, value) => setForm((p) => ({ ...p, [key]: value }));
-  const save = () => { setData((p) => ({ ...p, hospitalRecords: sortByDate([...p.hospitalRecords, { ...form, id: uid(), createdAt: new Date().toISOString() }]) })); setTab("book"); };
-  return <div className="card pad"><h2 className="form-title">Chapter 4. 병원 · 건강 관리</h2><PhotoSlot photo={form.photo} onPhoto={(v) => update("photo", v)} onRemove={() => update("photo", "")} /><div className="two"><label>날짜<input type="date" value={form.date} onChange={(e) => update("date", e.target.value)} /></label><label>임신 주차<input value={form.week} onChange={(e) => update("week", e.target.value)} /></label></div><label>병원명<input value={form.hospital} onChange={(e) => update("hospital", e.target.value)} /></label><label>검진 내용<input value={form.checkup} onChange={(e) => update("checkup", e.target.value)} placeholder="예: 정기검진, 초음파" /></label><label>컨디션<input value={form.condition} onChange={(e) => update("condition", e.target.value)} /></label><label>다음 진료일<input type="date" value={form.nextDate} onChange={(e) => update("nextDate", e.target.value)} /></label><label>메모<textarea value={form.memo} onChange={(e) => update("memo", e.target.value)} /></label><button className="primary" onClick={save}>🏥 병원 기록 저장하기</button></div>;
+  const save = () => { setData((p) => ({ ...p, hospitalRecords: sortByDate([...p.hospitalRecords, { ...form, ...scene, id: uid(), createdAt: new Date().toISOString() }]) })); setTab("book"); };
+  return <div className="card pad"><h2 className="form-title">Chapter 4. 병원 · 건강 관리</h2>{form.photo ? <PhotoSlot photo={form.photo} onPhoto={(v) => update("photo", v)} onRemove={() => update("photo", "")} /> : <SceneWizard scene={scene} onChange={setScene} title="병원 기록 그림 수정"/>}<div className="photo-line"><PhotoSlot photo={form.photo} onPhoto={(v) => update("photo", v)} onRemove={() => update("photo", "")} /></div><div className="two"><label>날짜<input type="date" value={form.date} onChange={(e) => update("date", e.target.value)} /></label><label>임신 주차<input value={form.week} onChange={(e) => update("week", e.target.value)} /></label></div><label>병원명<input value={form.hospital} onChange={(e) => update("hospital", e.target.value)} /></label><label>검진 내용<input value={form.checkup} onChange={(e) => update("checkup", e.target.value)} placeholder="예: 정기검진, 초음파" /></label><label>컨디션<input value={form.condition} onChange={(e) => update("condition", e.target.value)} /></label><label>다음 진료일<input type="date" value={form.nextDate} onChange={(e) => update("nextDate", e.target.value)} /></label><label>메모<textarea value={form.memo} onChange={(e) => update("memo", e.target.value)} /></label><button className="primary" onClick={save}>🏥 병원 기록 저장하기</button></div>;
 }
 function PrepareForm({ data, setData }) {
   const [text, setText] = useState(""), [bucket, setBucket] = useState("");
@@ -633,7 +650,7 @@ function Write({ data, setData, writeTab, setWriteTab, setTab }) {
 function Book({ data, setData }) {
   const remove = (key, id) => setData((p) => ({ ...p, [key]: p[key].filter((item) => item.id !== id) }));
   const records = [...data.dailyRecords.map((r) => ({ ...r, type: "daily" })), ...data.activityRecords.map((r) => ({ ...r, type: "activity" })), ...data.hospitalRecords.map((r) => ({ ...r, type: "hospital" }))].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  return <main className="screen"><section className="book-cover card"><SceneComposer mood={data.babyInfo.coverMood} bg={data.babyInfo.coverBg} character={data.babyInfo.coverChar} activity={data.babyInfo.coverActivity}/><div><h2>{data.babyInfo.babyName || "우리 아기"}를 기다리며</h2><p>{data.babyInfo.dueDate ? `출산 예정일 ${fmtDate(data.babyInfo.dueDate)}` : "출산 예정일을 입력해보세요."}</p></div></section>{records.length === 0 ? <div className="empty card">아직 저장된 기록이 없어요.<br/>오늘의 태교 장면을 먼저 기록해보세요.</div> : records.map((r) => { const key = r.type === "daily" ? "dailyRecords" : r.type === "activity" ? "activityRecords" : "hospitalRecords"; return <article className="record card" key={`${r.type}-${r.id}`}><div className="record-top"><div><strong>{r.type === "daily" ? "임신 주차 기록" : r.type === "activity" ? "태교 활동" : "병원 기록"}</strong><p>{fmtDate(r.date)} {r.week ? `· ${r.week}` : ""}</p></div><button onClick={() => remove(key, r.id)}>삭제</button></div>{r.photo ? <PhotoSlot photo={r.photo} small/> : r.type === "hospital" ? <div className="hospital-illust">🏥</div> : <SceneComposer mood={r.mood || "사랑"} bg={r.bg || "garden"} character={r.character || "family"} activity={r.activity || "태담"} small/>}{r.activity && <span className="tag">{getActivity(r.activity).emoji} {getActivity(r.activity).label}</span>}{r.condition && <span className="tag">{r.condition}</span>}{r.checkup && <p>{r.checkup}</p>}{r.feeling && <p>{r.feeling}</p>}{r.message && <blockquote>{r.message}</blockquote>}{r.memory && <p className="muted-text">{r.memory}</p>}{r.memo && <p className="muted-text">{r.memo}</p>}</article>; })}</main>;
+  return <main className="screen"><section className="book-cover card"><SceneComposer mood={data.babyInfo.coverMood} bg={data.babyInfo.coverBg} character={data.babyInfo.coverChar} activity={data.babyInfo.coverActivity}/><div><h2>{data.babyInfo.babyName || "우리 아기"}를 기다리며</h2><p>{data.babyInfo.dueDate ? `출산 예정일 ${fmtDate(data.babyInfo.dueDate)}` : "출산 예정일을 입력해보세요."}</p></div></section>{records.length === 0 ? <div className="empty card">아직 저장된 기록이 없어요.<br/>오늘의 태교 장면을 먼저 기록해보세요.</div> : records.map((r) => { const key = r.type === "daily" ? "dailyRecords" : r.type === "activity" ? "activityRecords" : "hospitalRecords"; return <article className="record card" key={`${r.type}-${r.id}`}><div className="record-top"><div><strong>{r.type === "daily" ? "임신 주차 기록" : r.type === "activity" ? "태교 활동" : "병원 기록"}</strong><p>{fmtDate(r.date)} {r.week ? `· ${r.week}` : ""}</p></div><button onClick={() => remove(key, r.id)}>삭제</button></div>{r.photo ? <PhotoSlot photo={r.photo} small/> : r.type === "hospital" ? <SceneComposer mood={r.mood || "편안함"} bg={r.bg || "clinic"} character={r.character || "mama"} activity={r.activity || "초음파"} small/> : <SceneComposer mood={r.mood || "사랑"} bg={r.bg || "garden"} character={r.character || "family"} activity={r.activity || "태담"} small/>}{r.activity && <span className="tag">{getActivity(r.activity).emoji} {getActivity(r.activity).label}</span>}{r.condition && <span className="tag">{r.condition}</span>}{r.checkup && <p>{r.checkup}</p>}{r.feeling && <p>{r.feeling}</p>}{r.message && <blockquote>{r.message}</blockquote>}{r.memory && <p className="muted-text">{r.memory}</p>}{r.memo && <p className="muted-text">{r.memo}</p>}</article>; })}</main>;
 }
 function Settings({ setData }) {
   const reset = () => { if (!confirm("저장된 태교북 기록을 모두 초기화할까요?")) return; localStorage.removeItem(STORAGE_KEY); setData(INITIAL); };
