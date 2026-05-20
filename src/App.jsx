@@ -27,6 +27,20 @@ import shoppingPng from "./assets/activities/shopping.png";
 import picnicPng from "./assets/activities/picnic.png";
 import prayerPng from "./assets/activities/prayer.png";
 
+import bgBeach from "./assets/backgrounds/beach.png";
+import bgCafe from "./assets/backgrounds/cafe.png";
+import bgClinic from "./assets/backgrounds/clinic.png";
+import bgForest from "./assets/backgrounds/forest.png";
+import bgGarden from "./assets/backgrounds/garden.png";
+import bgLibrary from "./assets/backgrounds/library.png";
+import bgNight from "./assets/backgrounds/night.png";
+import bgPicnic from "./assets/backgrounds/picnic.png";
+import bgRain from "./assets/backgrounds/rain.png";
+import bgRoom from "./assets/backgrounds/room.png";
+import bgSky from "./assets/backgrounds/sky.png";
+import bgSnow from "./assets/backgrounds/snow.png";
+import bgStudio from "./assets/backgrounds/studio.png";
+
 const STORAGE_KEY = "taegyo_book_family_v2";
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const today = () => new Date().toISOString().slice(0, 10);
@@ -61,6 +75,21 @@ const BACKGROUNDS = [
   { id: "cafe", label: "카페", emoji: "☕" }, { id: "rain", label: "비 오는 날", emoji: "🌧️" }, { id: "snow", label: "눈 오는 날", emoji: "❄️" },
   { id: "library", label: "도서관", emoji: "📚" }, { id: "studio", label: "사진관", emoji: "📷" }, { id: "clinic", label: "병원", emoji: "🏥" }, { id: "picnic", label: "피크닉", emoji: "🧺" }
 ];
+const BACKGROUND_ASSETS = {
+  beach: bgBeach,
+  cafe: bgCafe,
+  clinic: bgClinic,
+  forest: bgForest,
+  garden: bgGarden,
+  library: bgLibrary,
+  night: bgNight,
+  picnic: bgPicnic,
+  rain: bgRain,
+  room: bgRoom,
+  sky: bgSky,
+  snow: bgSnow,
+  studio: bgStudio
+};
 const CHARACTERS = [
   { id: "family", label: "온 가족", emoji: "👨‍👩‍👧" }, { id: "mama", label: "엄마와 아기", emoji: "🤰" }, { id: "mama_papa", label: "엄마 + 아빠", emoji: "👫" },
   { id: "mama_pet", label: "엄마 + 강아지", emoji: "🐶" }, { id: "mama_cat", label: "엄마 + 고양이", emoji: "🐱" }, { id: "mama_friend", label: "엄마 + 친구", emoji: "👭" },
@@ -164,20 +193,34 @@ function usePhotoUpload(onPhoto) {
 
 function BackgroundLayer({ bg, mood }) {
   const m = getMood(mood);
-  const base = <><rect width="420" height="260" fill={`url(#grad-${m.id})`} /><ellipse cx="210" cy="258" rx="245" ry="54" fill="#fff" opacity=".7" /><ellipse cx="210" cy="252" rx="230" ry="40" fill={m.accent} opacity=".1" /></>;
-  const clouds = <><g opacity=".72"><ellipse cx="78" cy="54" rx="36" ry="16" fill="#fff"/><ellipse cx="55" cy="60" rx="18" ry="11" fill="#fff"/><ellipse cx="99" cy="60" rx="20" ry="12" fill="#fff"/></g><g opacity=".62"><ellipse cx="325" cy="48" rx="34" ry="15" fill="#fff"/><ellipse cx="305" cy="54" rx="17" ry="10" fill="#fff"/><ellipse cx="345" cy="54" rx="19" ry="11" fill="#fff"/></g></>;
-  if (bg === "night") return <><rect width="420" height="260" fill="#17152f" />{Array.from({ length: 42 }).map((_, i) => <circle key={i} cx={(i * 47) % 400 + 10} cy={(i * 31) % 145 + 10} r={i % 6 === 0 ? 2.3 : 1.2} fill="#fff" opacity={.35 + (i % 5) * .09} />)}<circle cx="340" cy="54" r="28" fill="#fff2bd"/><circle cx="350" cy="47" r="23" fill="#17152f"/><ellipse cx="210" cy="258" rx="235" ry="54" fill="#232044"/><path d="M18 180 Q82 150 138 184 T262 185 T406 178 V260 H18 Z" fill="#111027" opacity=".9"/></>;
-  if (bg === "beach") return <><rect width="420" height="260" fill="#9bd9f2"/><circle cx="55" cy="45" r="25" fill="#ffe083"/><path d="M0 142 Q60 126 120 142 T240 142 T420 142 V260 H0 Z" fill="#8bcde8" opacity=".88"/><path d="M0 170 Q60 154 120 170 T240 170 T420 170" stroke="#fff" strokeWidth="4" fill="none" opacity=".7"/><ellipse cx="210" cy="260" rx="245" ry="70" fill="#f4d89d"/><g transform="translate(318 112)"><path d="M0 0 Q31 -31 65 0 Z" fill={m.accent} opacity=".86"/><line x1="32" y1="0" x2="32" y2="83" stroke="#a9855c" strokeWidth="4"/></g></>;
-  if (bg === "forest") return <>{base}{[20, 60, 102, 315, 360, 400].map((x, i) => <g key={x} transform={`translate(${x} ${76 + (i % 2) * 18})`} opacity=".88"><rect x="-6" y="74" width="12" height="70" fill="#a87953"/><circle cx="0" cy="58" r="42" fill={i % 2 ? "#6eaa72" : "#75b67b"}/><circle cx="-22" cy="76" r="28" fill="#80bd82"/><circle cx="22" cy="78" r="28" fill="#6dab72"/></g>)}<ellipse cx="210" cy="258" rx="245" ry="52" fill="#9ccf82"/></>;
-  if (bg === "room") return <><rect width="420" height="260" fill={m.sky[1]} /><rect y="194" width="420" height="66" fill="#ead9c0"/><rect x="296" y="28" width="90" height="116" rx="12" fill={m.sky[0]} stroke="#fff" strokeWidth="5"/><line x1="341" y1="28" x2="341" y2="144" stroke="#fff" strokeWidth="3"/><line x1="296" y1="86" x2="386" y2="86" stroke="#fff" strokeWidth="3"/><path d="M292 26 Q270 74 287 148" fill={m.accent} opacity=".4"/><path d="M390 26 Q410 74 393 148" fill={m.accent} opacity=".4"/><ellipse cx="210" cy="219" rx="120" ry="18" fill={m.accent} opacity=".18"/></>;
-  if (bg === "rain") return <><rect width="420" height="260" fill="#b8c7d2" />{[58, 176, 312].map((x, i) => <g key={x} opacity=".8"><ellipse cx={x} cy={42 + i * 8} rx="48" ry="24" fill="#7f8b98"/><ellipse cx={x - 26} cy={50 + i * 8} rx="26" ry="16" fill="#737f8c"/><ellipse cx={x + 28} cy={50 + i * 8} rx="30" ry="18" fill="#737f8c"/></g>)}{Array.from({ length: 28 }).map((_, i) => <line key={i} x1={(i * 19) % 420} y1={(i * 31) % 160 + 55} x2={(i * 19) % 420 - 7} y2={(i * 31) % 160 + 78} stroke="#fff" strokeWidth="2" opacity=".36" strokeLinecap="round" />)}<ellipse cx="210" cy="258" rx="245" ry="50" fill="#9cadb8" /></>;
-  if (bg === "snow") return <><rect width="420" height="260" fill="#dcecff" />{clouds}{Array.from({ length: 34 }).map((_, i) => <circle key={i} cx={(i * 53) % 410 + 5} cy={(i * 37) % 185 + 10} r={i % 4 === 0 ? 3 : 2} fill="#fff" opacity=".78" />)}<ellipse cx="210" cy="260" rx="245" ry="66" fill="#fff"/><g transform="translate(330 158)"><circle cx="0" cy="34" r="25" fill="#fff" stroke="#cbdcec"/><circle cx="0" cy="3" r="17" fill="#fff" stroke="#cbdcec"/></g></>;
-  if (["cafe", "library", "studio", "clinic", "picnic"].includes(bg)) {
-    const title = { cafe: "CAFE", library: "BOOK", studio: "PHOTO", clinic: "CARE", picnic: "PICNIC" }[bg];
-    const icon = { cafe: "☕", library: "📚", studio: "📷", clinic: "🏥", picnic: "🧺" }[bg];
-    return <>{base}<rect x="26" y="34" width="100" height="92" rx="18" fill="#fff" opacity=".72"/><text x="76" y="72" textAnchor="middle" fontSize="25">{icon}</text><text x="76" y="101" textAnchor="middle" fontSize="16" fontWeight="900" fill={m.deep}>{title}</text><ellipse cx="210" cy="258" rx="245" ry="50" fill={bg === "picnic" ? "#a8d58f" : "#ead9c0"}/></>;
+  const bgSrc = BACKGROUND_ASSETS[bg] || BACKGROUND_ASSETS.garden;
+
+  // src/assets/backgrounds/*.png 파일을 실제 배경 이미지로 사용합니다.
+  // 이미지가 화면 비율과 달라도 빈 여백 없이 꽉 차도록 slice로 처리합니다.
+  if (bgSrc) {
+    return (
+      <g>
+        <image
+          href={bgSrc}
+          x="0"
+          y="0"
+          width="420"
+          height="260"
+          preserveAspectRatio="xMidYMid slice"
+        />
+        <ellipse cx="210" cy="258" rx="245" ry="54" fill="#fff" opacity=".08" />
+      </g>
+    );
   }
-  return <>{base}{clouds}<ellipse cx="210" cy="258" rx="245" ry="50" fill="#b9df9a" />{[30, 72, 118, 290, 338, 386].map((x, i) => <g key={x} transform={`translate(${x} ${174 + (i % 2) * 12})`}><line x1="0" y1="20" x2="0" y2="-4" stroke="#68a95b" strokeWidth="3" strokeLinecap="round"/><circle cx="0" cy="-8" r="11" fill={[m.accent, "#ffd071", "#9fd3ff", "#cdb9ff"][i % 4]} opacity=".85"/><circle cx="0" cy="-8" r="4" fill="#fff" opacity=".65"/></g>)}</>;
+
+  // 혹시 배경 이미지가 없을 때만 보이는 안전용 기본 배경입니다.
+  return (
+    <>
+      <rect width="420" height="260" fill={`url(#grad-${m.id})`} />
+      <ellipse cx="210" cy="258" rx="245" ry="54" fill="#fff" opacity=".7" />
+      <ellipse cx="210" cy="252" rx="230" ry="40" fill={m.accent} opacity=".1" />
+    </>
+  );
 }
 
 function LeafDecor({ mood }) {
@@ -387,7 +430,7 @@ function BabyNamePopup({ data, setData }) {
 function Header({ data }) { return <header className="topbar"><div><p>Mobile Taegyo Book</p><h1>{data.babyInfo.babyName || "우리 아기"}의 태교북</h1></div><span>{getMood(data.babyInfo.coverMood).emoji}</span></header>; }
 function Home({ data, setTab, setWriteTab }) {
   const b = data.babyInfo;
-  return <main className="screen"><section className="hero card"><SceneComposer mood={b.coverMood} bg={b.coverBg} character={b.coverChar} activity={b.coverActivity}/><div className="hero-copy"><h2>{b.babyName || "우리 아기"}를 기다리는 그림일기</h2><p>기분, 배경, 인물, 태교 활동을 순서대로 골라 기록하는 모바일 태교북입니다.</p></div></section><section className="quick-grid">{[["✍️", "오늘 기록", "daily"], ["🌿", "태교 활동", "activity"], ["🏥", "병원 기록", "hospital"], ["📦", "출산 준비", "prepare"]].map(([icon, label, tab]) => <button key={tab} className="quick" onClick={() => { setWriteTab(tab); setTab("write"); }}><span>{icon}</span>{label}</button>)}</section><section className="card pad"><div className="section-head"><h3>기록 현황</h3><p>커버 그림 바꾸기는 제외했고, 기록 작성 화면에서만 연필 버튼으로 그림을 수정합니다.</p></div><div className="stats"><div><strong>{data.dailyRecords.length}</strong><span>주차 기록</span></div><div><strong>{data.activityRecords.length}</strong><span>활동 기록</span></div><div><strong>{data.hospitalRecords.length}</strong><span>병원 기록</span></div></div></section></main>;
+  return <main className="screen"><section className="hero card"><SceneComposer mood={b.coverMood} bg={b.coverBg} character={b.coverChar} activity={b.coverActivity}/><div className="hero-copy"><h2>{b.babyName || "우리 아기"}를 기다리는 그림일기</h2><p>기분, 배경, 인물, 태교 활동을 순서대로 골라 기록하는 모바일 태교북입니다.</p></div></section><section className="quick-grid">{[["✍️", "오늘 기록", "daily"], ["🌿", "태교 활동", "activity"], ["🏥", "병원 기록", "hospital"], ["📦", "출산 준비", "prepare"]].map(([icon, label, tab]) => <button key={tab} className="quick" onClick={() => { setWriteTab(isIntroWritten(b) ? tab : "intro"); setTab("write"); }}><span>{icon}</span>{label}</button>)}</section><section className="card pad"><div className="section-head"><h3>기록 현황</h3><p>커버 그림 바꾸기는 제외했고, 기록 작성 화면에서만 연필 버튼으로 그림을 수정합니다.</p></div><div className="stats"><div><strong>{data.dailyRecords.length}</strong><span>주차 기록</span></div><div><strong>{data.activityRecords.length}</strong><span>활동 기록</span></div><div><strong>{data.hospitalRecords.length}</strong><span>병원 기록</span></div></div></section></main>;
 }
 function IntroForm({ data, setData, setWriteTab }) {
   const b = data.babyInfo;
@@ -427,6 +470,65 @@ function PrepareForm({ data, setData }) {
   const List = ({ title, items, type }) => <section className="todo-section"><h3>{title}</h3>{items.map((item) => <div className="todo" key={item.id}><button className={item.done ? "check on" : "check"} onClick={() => toggle(type, item.id)}>{item.done ? "✓" : ""}</button><span className={item.done ? "done" : ""}>{item.text}</span><button onClick={() => remove(type, item.id)}>삭제</button></div>)}</section>;
   return <div className="card pad"><h2 className="form-title">Chapter 5. 출산 준비 & 버킷리스트</h2><div className="add"><input value={text} onChange={(e) => setText(e.target.value)} placeholder="준비할 것 추가"/><button onClick={() => add("checklistItems", text, setText)}>추가</button></div><List title="출산 준비 체크리스트" items={data.checklistItems} type="checklistItems"/><div className="add"><input value={bucket} onChange={(e) => setBucket(e.target.value)} placeholder="하고 싶은 일 추가"/><button onClick={() => add("bucketListItems", bucket, setBucket)}>추가</button></div><List title="출산 전 버킷리스트" items={data.bucketListItems} type="bucketListItems"/></div>;
 }
+
+function IntroStartPopup({ setWriteTab, setTab, onClose }) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9998,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 18,
+        background: "rgba(28, 22, 42, .38)",
+        backdropFilter: "blur(8px)"
+      }}
+    >
+      <section
+        style={{
+          width: "min(92vw, 390px)",
+          borderRadius: 28,
+          padding: "26px 22px 22px",
+          background: "rgba(255, 255, 255, .97)",
+          boxShadow: "0 24px 70px rgba(60, 39, 78, .24)",
+          border: "1px solid rgba(255,255,255,.7)",
+          textAlign: "center"
+        }}
+      >
+        <div style={{ fontSize: 36, marginBottom: 8 }}>📖</div>
+        <h2 style={{ margin: "0 0 8px", fontSize: 22, color: "#3f3344" }}>첫 이야기를 먼저 남겨볼까요?</h2>
+        <p style={{ margin: "0 0 18px", fontSize: 14, lineHeight: 1.6, color: "#7b7080" }}>
+          태명 설정 다음에는 Chapter 1에서 출산 예정일, 처음 알게 된 날, 아기에게 보내는 첫 마음을 한 번만 작성해요. 저장 후에는 기록 메뉴에서 주차 기록 · 태교 활동 · 병원 기록을 선택해서 입력할 수 있어요.
+        </p>
+        <button
+          type="button"
+          className="primary"
+          style={{ width: "100%", marginTop: 4 }}
+          onClick={() => {
+            setWriteTab("intro");
+            onClose();
+          }}
+        >
+          첫 이야기 작성하기
+        </button>
+        <button
+          type="button"
+          className="ghost"
+          style={{ width: "100%", marginTop: 8 }}
+          onClick={() => {
+            onClose();
+            setTab("home");
+          }}
+        >
+          홈으로 돌아가기
+        </button>
+      </section>
+    </div>
+  );
+}
+
 function RecordCategoryChooser({ setWriteTab }) {
   const options = [
     { id: "daily", icon: "🗓️", title: "주차 기록", desc: "임신 주차, 컨디션, 오늘의 기억을 남겨요." },
@@ -456,11 +558,36 @@ function RecordCategoryChooser({ setWriteTab }) {
 
 function Write({ data, setData, writeTab, setWriteTab, setTab }) {
   const introDone = isIntroWritten(data.babyInfo);
+  const [showIntroPrompt, setShowIntroPrompt] = useState(!introDone);
+
+  useEffect(() => {
+    if (!introDone) setShowIntroPrompt(true);
+  }, [introDone]);
+
   const tabs = introDone
     ? [{ id: "choose", label: "기록 선택" }, { id: "intro", label: "첫 이야기 수정" }, { id: "daily", label: "주차 기록" }, { id: "activity", label: "태교 활동" }, { id: "hospital", label: "병원" }, { id: "prepare", label: "준비" }]
     : [{ id: "intro", label: "첫 이야기" }];
 
-  return <main className="screen"><div className="tabs">{tabs.map((t) => <button key={t.id} className={writeTab === t.id ? "on" : ""} onClick={() => setWriteTab(t.id)}>{t.label}</button>)}</div>{writeTab === "choose" && <RecordCategoryChooser setWriteTab={setWriteTab}/>} {writeTab === "intro" && <IntroForm data={data} setData={setData} setWriteTab={setWriteTab}/>} {writeTab === "daily" && <DailyForm setData={setData} setTab={setTab}/>} {writeTab === "activity" && <ActivityForm setData={setData} setTab={setTab}/>} {writeTab === "hospital" && <HospitalForm setData={setData} setTab={setTab}/>} {writeTab === "prepare" && <PrepareForm data={data} setData={setData}/>}</main>;
+  const safeWriteTab = introDone ? writeTab : "intro";
+
+  return (
+    <main className="screen">
+      {!introDone && showIntroPrompt && (
+        <IntroStartPopup
+          setWriteTab={setWriteTab}
+          setTab={setTab}
+          onClose={() => setShowIntroPrompt(false)}
+        />
+      )}
+      <div className="tabs">{tabs.map((t) => <button key={t.id} className={safeWriteTab === t.id ? "on" : ""} onClick={() => setWriteTab(t.id)}>{t.label}</button>)}</div>
+      {safeWriteTab === "choose" && <RecordCategoryChooser setWriteTab={setWriteTab}/>} 
+      {safeWriteTab === "intro" && <IntroForm data={data} setData={setData} setWriteTab={setWriteTab}/>} 
+      {safeWriteTab === "daily" && <DailyForm setData={setData} setTab={setTab}/>} 
+      {safeWriteTab === "activity" && <ActivityForm setData={setData} setTab={setTab}/>} 
+      {safeWriteTab === "hospital" && <HospitalForm setData={setData} setTab={setTab}/>} 
+      {safeWriteTab === "prepare" && <PrepareForm data={data} setData={setData}/>} 
+    </main>
+  );
 }
 function Book({ data, setData }) {
   const remove = (key, id) => setData((p) => ({ ...p, [key]: p[key].filter((item) => item.id !== id) }));
