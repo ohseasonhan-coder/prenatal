@@ -367,17 +367,15 @@ function ActivityLayer({ activity, mood, character = "family" }) {
   const drawX  = imgX + (imgW - crop.w * scale) / 2 - crop.x * scale;
   const drawY  = imgY + (imgH - crop.h * scale) / 2 - crop.y * scale;
 
-  // 꼬리: 말풍선 하단에서 엄마 머리 방향(tailDx, tailDy)으로
-  // 꼬리 뾰족점 = (bx + tailDx * 0.5, by + rh + tailDy * 0.6)
-  const tx = bx + tailDx * 0.45;
-  const ty = by + rh + tailDy * 0.55;
+  // 꼬리: 짧고 부드럽게 — 말풍선 하단에서 엄마 방향으로 살짝만
+  const tailOffX = tailDx > 0 ? 12 : -12; // 엄마 방향 쪽으로 살짝 치우침
   const tail = {
-    p1: `${bx + tailDx * 0.1 - 10},${by + rh - 4}`,
-    p2: `${tx},${ty}`,
-    p3: `${bx + tailDx * 0.1 + 10},${by + rh - 4}`,
-    d1: `${bx + tailDx * 0.1 - 8},${by + rh - 3}`,
-    d2: `${bx + tailDx * 0.38},${by + rh + tailDy * 0.44}`,
-    d3: `${bx + tailDx * 0.1 + 8},${by + rh - 3}`,
+    p1: `${bx + tailOffX - 8},${by + rh - 2}`,
+    p2: `${bx + tailOffX * 2},${by + rh + 16}`,   // 꼬리 길이 16px로 짧게
+    p3: `${bx + tailOffX + 8},${by + rh - 2}`,
+    d1: `${bx + tailOffX - 6},${by + rh - 1}`,
+    d2: `${bx + tailOffX * 2},${by + rh + 11}`,
+    d3: `${bx + tailOffX + 6},${by + rh - 1}`,
   };
 
   return (
