@@ -323,19 +323,31 @@ function ActivityLayer({ activity, mood, character = "family" }) {
   // 캐릭터별 엄마 머리 위 좌표 — PNG는 x:58~362,y:34~242 영역에 meet 배치
   // SVG 폴백 Mom 위치 기준으로 역산: translate(0 30) 적용 포함
   // 말풍선 중심은 엄마 머리 바로 위 (머리 y에서 rh+10 위로)
-  // 캐릭터별 말풍선 위치: 엄마 머리 대각선 위로 빼서 얼굴 안 가리게
-  // bx: 엄마 머리에서 옆으로 이동, by: 위로 이동
+  // 캐릭터별 말풍선 위치 — 엄마 머리 대각선 위
+  // SVG 폴백 Mom 좌표 기준 + translate(0 60) 반영
+  // 엄마 머리 중심: (momX, momY + 60 - 35)
+  // 말풍선 중심: 엄마 머리에서 대각선으로 bx는 ±70, by는 -70 위로
+  //
+  // mama:         Mom x=210 y=116 → 머리(210, 141) → 말풍선 오른쪽 위(320, 62)
+  // mama_papa:    Mom x=246 y=119 → 머리(246, 144) → 오른쪽에 이미 있어 오른쪽 위(356, 65) 대신 왼쪽 위(136, 65)
+  // mama_pet:     Mom x=200 y=116 → 머리(200, 141) → 오른쪽 위(310, 62)
+  // mama_cat:     Mom x=200 y=116 → 오른쪽 위(310, 62)
+  // mama_friend:  Mom x=248 y=121(오른쪽) → 오른쪽 위 공간 없으니 왼쪽 위(138, 62)
+  // mama_grandma: Mom x=252 y=122(오른쪽) → 왼쪽 위(142, 63)
+  // couple_baby:  Mom x=255 y=118 → 오른쪽 위(355, 62)
+  // family:       Mom x=251 y=118 → 오른쪽 위(355, 62)
   const BUBBLE_POS = {
-    mama:         { bx: 355, by: 38 },  // 엄마 혼자: 오른쪽 상단 대각선
-    mama_papa:    { bx: 355, by: 38 },  // 엄마 오른쪽: 오른쪽 상단
-    mama_pet:     { bx: 355, by: 38 },  // 엄마 중앙: 오른쪽 상단
-    mama_cat:     { bx: 355, by: 38 },
-    mama_friend:  { bx: 355, by: 38 },  // 오른쪽 엄마: 오른쪽 상단
-    mama_grandma: { bx: 355, by: 38 },
-    couple_baby:  { bx: 355, by: 38 },  // 오른쪽 엄마: 오른쪽 상단
-    family:       { bx: 355, by: 38 },  // 엄마 오른쪽: 오른쪽 상단
+    mama:         { bx: 325, by: 55,  tailDx: -115, tailDy: 86  },
+    mama_papa:    { bx: 130, by: 55,  tailDx:  116, tailDy: 89  },
+    mama_pet:     { bx: 315, by: 55,  tailDx: -115, tailDy: 86  },
+    mama_cat:     { bx: 315, by: 55,  tailDx: -115, tailDy: 86  },
+    mama_friend:  { bx: 130, by: 55,  tailDx:  118, tailDy: 89  },
+    mama_grandma: { bx: 130, by: 55,  tailDx:  122, tailDy: 90  },
+    couple_baby:  { bx: 355, by: 50,  tailDx: -100, tailDy: 94  },
+    family:       { bx: 355, by: 50,  tailDx: -104, tailDy: 98  },
   };
-  const { bx, by } = BUBBLE_POS[character] || { bx: 355, by: 38 };
+  const pos = BUBBLE_POS[character] || { bx: 325, by: 55, tailDx: -115, tailDy: 86 };
+  const { bx, by, tailDx, tailDy } = pos;
   const tailLeft = false; // 꼬리는 항상 아래쪽 (엄마 머리 위에 뜨므로)
 
   const rw = 52;
@@ -355,10 +367,17 @@ function ActivityLayer({ activity, mood, character = "family" }) {
   const drawX  = imgX + (imgW - crop.w * scale) / 2 - crop.x * scale;
   const drawY  = imgY + (imgH - crop.h * scale) / 2 - crop.y * scale;
 
-  // 꼬리: 말풍선 왼쪽 하단에서 엄마 머리 쪽(왼쪽 아래)으로
+  // 꼬리: 말풍선 하단에서 엄마 머리 방향(tailDx, tailDy)으로
+  // 꼬리 뾰족점 = (bx + tailDx * 0.5, by + rh + tailDy * 0.6)
+  const tx = bx + tailDx * 0.45;
+  const ty = by + rh + tailDy * 0.55;
   const tail = {
-    p1: `${bx - 20},${by + rh - 4}`, p2: `${bx - 48},${by + rh + 26}`, p3: `${bx - 4},${by + rh - 10}`,
-    d1: `${bx - 19},${by + rh - 3}`, d2: `${bx - 42},${by + rh + 18}`,  d3: `${bx - 5},${by + rh - 9}`,
+    p1: `${bx + tailDx * 0.1 - 10},${by + rh - 4}`,
+    p2: `${tx},${ty}`,
+    p3: `${bx + tailDx * 0.1 + 10},${by + rh - 4}`,
+    d1: `${bx + tailDx * 0.1 - 8},${by + rh - 3}`,
+    d2: `${bx + tailDx * 0.38},${by + rh + tailDy * 0.44}`,
+    d3: `${bx + tailDx * 0.1 + 8},${by + rh - 3}`,
   };
 
   return (
