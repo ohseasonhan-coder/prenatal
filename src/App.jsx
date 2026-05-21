@@ -320,19 +320,24 @@ function ActivityLayer({ activity, mood, character = "family" }) {
   const activitySrc = ACTIVITY_ASSETS[activity];
   const crop = ACTIVITY_CROPS[activity] || ACTIVITY_CROPS["운동"];
 
-  // 캐릭터별 말풍선 위치 — 인물과 겹치지 않도록 조정
-  const BUBBLE_POS = {
-    family:       { bx: 52,  by: 44 },
-    couple_baby:  { bx: 52,  by: 44 },
-    mama_papa:    { bx: 52,  by: 44 },
-    mama_friend:  { bx: 52,  by: 44 },
-    mama_grandma: { bx: 52,  by: 44 },
-    mama:         { bx: 368, by: 44 },
-    mama_pet:     { bx: 368, by: 44 },
-    mama_cat:     { bx: 368, by: 44 },
+  // 캐릭터별 엄마 머리 위 좌표 — PNG는 x:58~362,y:34~242 영역에 meet 배치
+  // SVG 폴백 Mom 위치 기준으로 역산: translate(0 30) 적용 포함
+  // 말풍선 중심은 엄마 머리 바로 위 (머리 y에서 rh+10 위로)
+  const MOM_HEAD = {
+    mama:         { hx: 210, hy: 114 },  // Mom x=210 y=116, scale=1.06
+    mama_papa:    { hx: 246, hy: 119 },  // Mom x=246 y=119, scale=0.98 → 오른쪽
+    mama_pet:     { hx: 200, hy: 116 },  // Mom x=200 y=116
+    mama_cat:     { hx: 200, hy: 116 },
+    mama_friend:  { hx: 248, hy: 121 },  // 오른쪽 엄마
+    mama_grandma: { hx: 252, hy: 122 },  // 오른쪽 엄마
+    couple_baby:  { hx: 255, hy: 118 },  // Mom x=255 y=118
+    family:       { hx: 251, hy: 118 },  // Mom 기본
   };
-  const { bx, by } = BUBBLE_POS[character] || { bx: 368, by: 44 };
-  const tailLeft = bx < 210; // 왼쪽 배치면 꼬리를 오른쪽으로
+  const head = MOM_HEAD[character] || { hx: 251, hy: 118 };
+  // translate(0 30) 반영 + 말풍선을 머리 위로 올림
+  const bx = Math.min(Math.max(head.hx, 56), 364); // SVG 경계 안으로 클램프
+  const by = Math.max(head.hy + 30 - 52, 42);       // 머리 위로 rh+여백
+  const tailLeft = false; // 꼬리는 항상 아래쪽 (엄마 머리 위에 뜨므로)
 
   const rw = 52;
   const rh = 40;
@@ -351,12 +356,11 @@ function ActivityLayer({ activity, mood, character = "family" }) {
   const drawX  = imgX + (imgW - crop.w * scale) / 2 - crop.x * scale;
   const drawY  = imgY + (imgH - crop.h * scale) / 2 - crop.y * scale;
 
-  // 꼬리 포인트: 왼쪽 배치면 오른쪽 하단, 오른쪽 배치면 왼쪽 하단
-  const tail = tailLeft
-    ? { p1: `${bx + 18},${by + rh - 2}`, p2: `${bx + 34},${by + rh + 20}`, p3: `${bx + 2},${by + rh - 8}`,
-        d1: `${bx + 18},${by + rh - 1}`, d2: `${bx + 30},${by + rh + 14}`, d3: `${bx + 3},${by + rh - 7}` }
-    : { p1: `${bx - 18},${by + rh - 2}`, p2: `${bx - 34},${by + rh + 20}`, p3: `${bx - 2},${by + rh - 8}`,
-        d1: `${bx - 18},${by + rh - 1}`, d2: `${bx - 30},${by + rh + 14}`, d3: `${bx - 3},${by + rh - 7}` };
+  // 꼬리: 말풍선 하단 중앙에서 엄마 머리 쪽으로 내려옴
+  const tail = {
+    p1: `${bx - 12},${by + rh - 2}`, p2: `${bx},${by + rh + 22}`, p3: `${bx + 12},${by + rh - 2}`,
+    d1: `${bx - 10},${by + rh - 1}`, d2: `${bx},${by + rh + 16}`,  d3: `${bx + 10},${by + rh - 1}`,
+  };
 
   return (
     <g>
