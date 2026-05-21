@@ -412,8 +412,15 @@ function SceneWizard({ scene, onChange, title = "그림 만들기" }) {
       setOpen(false);
     }
   };
-  const reset = () => { setStep(0); setOpen(true); };
-  return <div className="scene-editor"><SceneComposer {...scene} large editable onEdit={reset}/><div className="selected-summary"><span>{getMood(scene.mood).emoji} {getMood(scene.mood).label}</span><span>{BACKGROUNDS.find(b => b.id === scene.bg)?.emoji} {BACKGROUNDS.find(b => b.id === scene.bg)?.label}</span><span>{CHARACTERS.find(c => c.id === scene.character)?.emoji} {CHARACTERS.find(c => c.id === scene.character)?.label}</span><span>{getActivity(scene.activity).emoji} {getActivity(scene.activity).label}</span></div>{open && <div className="wizard-backdrop"><section className="wizard"><div className="wizard-head"><div><strong>{title}</strong><p>{step + 1} / {steps.length}</p></div><button type="button" onClick={() => setOpen(false)}>×</button></div><div className="progress"><span style={{ width: `${((step + 1) / steps.length) * 100}%` }} /></div><h3>{current.title}</h3><p className="muted-text">{current.sub}</p><div className="choice-grid">{current.list.map((item) => <button type="button" key={item.id} className={scene[current.key] === item.id ? "choice on" : "choice"} onClick={() => select(item.id)}><span>{item.emoji}</span>{item.label}</button>)}</div><div className="wizard-actions wizard-actions-prev-only"><button type="button" className="ghost" disabled={step === 0} onClick={() => setStep((v) => Math.max(0, v - 1))}>이전</button></div></section></div>}</div>;
+  const openAt = (stepIndex) => { setStep(stepIndex); setOpen(true); };
+  const reset = () => openAt(0);
+  const summaryItems = [
+    { emoji: getMood(scene.mood).emoji, label: getMood(scene.mood).label, stepIndex: 0 },
+    { emoji: BACKGROUNDS.find(b => b.id === scene.bg)?.emoji, label: BACKGROUNDS.find(b => b.id === scene.bg)?.label, stepIndex: 1 },
+    { emoji: CHARACTERS.find(c => c.id === scene.character)?.emoji, label: CHARACTERS.find(c => c.id === scene.character)?.label, stepIndex: 2 },
+    { emoji: getActivity(scene.activity).emoji, label: getActivity(scene.activity).label, stepIndex: 3 },
+  ];
+  return <div className="scene-editor"><SceneComposer {...scene} large editable onEdit={reset}/><div className="selected-summary">{summaryItems.map(({ emoji, label, stepIndex }) => <button type="button" key={stepIndex} className="summary-tag" onClick={() => openAt(stepIndex)}><span>{emoji}</span>{label}</button>)}</div>{open && <div className="wizard-backdrop"><section className="wizard"><div className="wizard-head"><div><strong>{title}</strong><p>{step + 1} / {steps.length}</p></div><button type="button" onClick={() => setOpen(false)}>×</button></div><div className="progress"><span style={{ width: `${((step + 1) / steps.length) * 100}%` }} /></div><h3>{current.title}</h3><p className="muted-text">{current.sub}</p><div className="choice-grid">{current.list.map((item) => <button type="button" key={item.id} className={scene[current.key] === item.id ? "choice on" : "choice"} onClick={() => select(item.id)}><span>{item.emoji}</span>{item.label}</button>)}</div><div className="wizard-actions wizard-actions-prev-only"><button type="button" className="ghost" disabled={step === 0} onClick={() => setStep((v) => Math.max(0, v - 1))}>이전</button></div></section></div>}</div>;
 }
 
 
