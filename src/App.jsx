@@ -333,10 +333,9 @@ function ActivityLayer({ activity, mood, character = "family" }) {
     couple_baby:  { hx: 255, hy: 148 },
     family:       { hx: 251, hy: 148 },
   };
-  const head = MOM_HEAD[character] || { hx: 251, hy: 118 };
-  // translate(0 30) 반영 + 말풍선을 머리 위로 올림
-  const bx = Math.min(Math.max(head.hx, 56), 364); // SVG 경계 안으로 클램프
-  const by = Math.max(head.hy + 30 - 52, 42);       // 머리 위로 rh+여백
+  const head = MOM_HEAD[character] || { hx: 251, hy: 148 };
+  const bx = Math.min(Math.max(head.hx, 56), 364);
+  const by = Math.max(head.hy - 40 - 42, 8); // 머리 위로 (rh + 여백 40px)
   const tailLeft = false; // 꼬리는 항상 아래쪽 (엄마 머리 위에 뜨므로)
 
   const rw = 52;
