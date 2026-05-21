@@ -322,53 +322,60 @@ function ActivityLayer({ activity, mood }) {
 
   const bx = 300;
   const by = 52;
-  const rw = 56;
-  const rh = 42;
+  const rw = 60;
+  const rh = 44;
   const clipId = `act-clip-${activity}`;
+
+  // 말풍선 내부 이미지 영역
+  const imgX = bx - rw + 5;
+  const imgY = by - rh + 5;
+  const imgW = rw * 2 - 10;
+  const imgH = rh * 2 - 10;
+
+  // crop 비율을 유지하며 imgW x imgH 안에 meet으로 배치
+  const scaleX = imgW / crop.w;
+  const scaleY = imgH / crop.h;
+  const scale  = Math.min(scaleX, scaleY);
+  const drawW  = 1536 * scale;
+  const drawH  = 1024 * scale;
+  const drawX  = imgX + (imgW - crop.w * scale) / 2 - crop.x * scale;
+  const drawY  = imgY + (imgH - crop.h * scale) / 2 - crop.y * scale;
 
   return (
     <g>
       <defs>
         <clipPath id={clipId}>
-          <rect x={bx - rw + 4} y={by - rh + 4} width={rw * 2 - 8} height={rh * 2 - 8} rx={rh - 4} />
+          <rect x={imgX} y={imgY} width={imgW} height={imgH} rx={rh - 5} />
         </clipPath>
       </defs>
 
       {/* 1. 그림자 */}
-      <ellipse cx={bx + 2} cy={by + rh + 6} rx={rw - 8} ry={6} fill="#000" opacity=".07" />
+      <ellipse cx={bx + 2} cy={by + rh + 6} rx={rw - 10} ry={6} fill="#000" opacity=".07" />
 
       {/* 2. 말풍선 흰 배경 */}
       <rect x={bx - rw} y={by - rh} width={rw * 2} height={rh * 2} rx={rh} fill="#fff" opacity=".96" />
 
-      {/* 3. 꼬리 (이미지 아래에 깔림) */}
-      <polygon points={`${bx - 22},${by + rh - 2} ${bx - 36},${by + rh + 20} ${bx - 4},${by + rh - 8}`} fill="#fff" opacity=".96" />
+      {/* 3. 꼬리 흰 배경 */}
+      <polygon points={`${bx - 22},${by + rh - 2} ${bx - 38},${by + rh + 22} ${bx - 2},${by + rh - 8}`} fill="#fff" opacity=".96" />
 
-      {/* 4. 활동 PNG — 말풍선 위에 클립해서 표시 */}
+      {/* 4. 활동 이미지 — clipPath로 말풍선 안에 가둠 */}
       {activitySrc ? (
-        <svg
-          x={bx - rw + 4} y={by - rh + 4}
-          width={rw * 2 - 8} height={rh * 2 - 8}
-          viewBox={`${crop.x} ${crop.y} ${crop.w} ${crop.h}`}
-          preserveAspectRatio="xMidYMid meet"
+        <image
+          href={activitySrc}
+          x={drawX} y={drawY}
+          width={drawW} height={drawH}
           clipPath={`url(#${clipId})`}
-        >
-          <image
-            href={activitySrc}
-            x="0" y="0"
-            width="1536" height="1024"
-            preserveAspectRatio="xMidYMid meet"
-          />
-        </svg>
+        />
       ) : (
         <text x={bx} y={by + 8} textAnchor="middle" fontSize="26">{a.emoji}</text>
       )}
 
-      {/* 5. 무드 테두리 — 맨 위에 덮어서 이미지 경계를 깔끔하게 */}
+      {/* 5. 무드 테두리 — 이미지 위에 덮어 경계 마감 */}
       <rect x={bx - rw} y={by - rh} width={rw * 2} height={rh * 2} rx={rh} fill="none" stroke={m.accent} strokeWidth="2.5" opacity=".65" />
-      {/* 꼬리 테두리 */}
-      <polygon points={`${bx - 22},${by + rh - 2} ${bx - 36},${by + rh + 20} ${bx - 4},${by + rh - 8}`} fill="none" stroke={m.accent} strokeWidth="2.5" strokeLinejoin="round" opacity=".65" />
-      {/* 꼬리 안쪽 덮개 */}
-      <polygon points={`${bx - 22},${by + rh - 1} ${bx - 32},${by + rh + 15} ${bx - 5},${by + rh - 7}`} fill="#fff" opacity=".96" />
+
+      {/* 6. 꼬리 테두리 + 덮개 */}
+      <polygon points={`${bx - 22},${by + rh - 2} ${bx - 38},${by + rh + 22} ${bx - 2},${by + rh - 8}`} fill="none" stroke={m.accent} strokeWidth="2.5" strokeLinejoin="round" opacity=".65" />
+      <polygon points={`${bx - 21},${by + rh - 1} ${bx - 34},${by + rh + 16} ${bx - 3},${by + rh - 7}`} fill="#fff" opacity=".96" />
     </g>
   );
 }
