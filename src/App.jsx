@@ -262,7 +262,7 @@ function FamilyIllustration({ character, mood }) {
   if (characterSrc) {
     const fadeId = `char-fade-${character}`;
     return (
-      <g transform="translate(0 30)">
+      <g transform="translate(0 60)">
         <defs>
           <linearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#fff" stopOpacity="1" />
@@ -324,14 +324,14 @@ function ActivityLayer({ activity, mood, character = "family" }) {
   // SVG 폴백 Mom 위치 기준으로 역산: translate(0 30) 적용 포함
   // 말풍선 중심은 엄마 머리 바로 위 (머리 y에서 rh+10 위로)
   const MOM_HEAD = {
-    mama:         { hx: 210, hy: 114 },  // Mom x=210 y=116, scale=1.06
-    mama_papa:    { hx: 246, hy: 119 },  // Mom x=246 y=119, scale=0.98 → 오른쪽
-    mama_pet:     { hx: 200, hy: 116 },  // Mom x=200 y=116
-    mama_cat:     { hx: 200, hy: 116 },
-    mama_friend:  { hx: 248, hy: 121 },  // 오른쪽 엄마
-    mama_grandma: { hx: 252, hy: 122 },  // 오른쪽 엄마
-    couple_baby:  { hx: 255, hy: 118 },  // Mom x=255 y=118
-    family:       { hx: 251, hy: 118 },  // Mom 기본
+    mama:         { hx: 210, hy: 144 },  // translate(0 60) 반영
+    mama_papa:    { hx: 246, hy: 149 },
+    mama_pet:     { hx: 200, hy: 146 },
+    mama_cat:     { hx: 200, hy: 146 },
+    mama_friend:  { hx: 248, hy: 151 },
+    mama_grandma: { hx: 252, hy: 152 },
+    couple_baby:  { hx: 255, hy: 148 },
+    family:       { hx: 251, hy: 148 },
   };
   const head = MOM_HEAD[character] || { hx: 251, hy: 118 };
   // translate(0 30) 반영 + 말풍선을 머리 위로 올림
