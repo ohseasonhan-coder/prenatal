@@ -323,20 +323,19 @@ function ActivityLayer({ activity, mood, character = "family" }) {
   // 캐릭터별 엄마 머리 위 좌표 — PNG는 x:58~362,y:34~242 영역에 meet 배치
   // SVG 폴백 Mom 위치 기준으로 역산: translate(0 30) 적용 포함
   // 말풍선 중심은 엄마 머리 바로 위 (머리 y에서 rh+10 위로)
-  const MOM_HEAD = {
-    mama:         { hx: 210, hy: 144 },  // translate(0 60) 반영
-    mama_papa:    { hx: 246, hy: 149 },
-    mama_pet:     { hx: 200, hy: 146 },
-    mama_cat:     { hx: 200, hy: 146 },
-    mama_friend:  { hx: 248, hy: 151 },
-    mama_grandma: { hx: 252, hy: 152 },
-    couple_baby:  { hx: 255, hy: 148 },
-    family:       { hx: 251, hy: 148 },
+  // 캐릭터별 말풍선 위치: 엄마 머리 대각선 위로 빼서 얼굴 안 가리게
+  // bx: 엄마 머리에서 옆으로 이동, by: 위로 이동
+  const BUBBLE_POS = {
+    mama:         { bx: 355, by: 38 },  // 엄마 혼자: 오른쪽 상단 대각선
+    mama_papa:    { bx: 355, by: 38 },  // 엄마 오른쪽: 오른쪽 상단
+    mama_pet:     { bx: 355, by: 38 },  // 엄마 중앙: 오른쪽 상단
+    mama_cat:     { bx: 355, by: 38 },
+    mama_friend:  { bx: 355, by: 38 },  // 오른쪽 엄마: 오른쪽 상단
+    mama_grandma: { bx: 355, by: 38 },
+    couple_baby:  { bx: 355, by: 38 },  // 오른쪽 엄마: 오른쪽 상단
+    family:       { bx: 355, by: 38 },  // 엄마 오른쪽: 오른쪽 상단
   };
-  const head = MOM_HEAD[character] || { hx: 251, hy: 148 };
-  const bx = Math.min(Math.max(head.hx, 56), 364);
-  // 꼬리 끝(by + rh + 22)이 엄마 머리(hy)보다 살짝 위 → by = hy - rh - 22 - 여백
-  const by = Math.max(head.hy - 40 - 22 - 30, 8);
+  const { bx, by } = BUBBLE_POS[character] || { bx: 355, by: 38 };
   const tailLeft = false; // 꼬리는 항상 아래쪽 (엄마 머리 위에 뜨므로)
 
   const rw = 52;
@@ -356,10 +355,10 @@ function ActivityLayer({ activity, mood, character = "family" }) {
   const drawX  = imgX + (imgW - crop.w * scale) / 2 - crop.x * scale;
   const drawY  = imgY + (imgH - crop.h * scale) / 2 - crop.y * scale;
 
-  // 꼬리: 말풍선 하단 중앙에서 엄마 머리 쪽으로 내려옴
+  // 꼬리: 말풍선 왼쪽 하단에서 엄마 머리 쪽(왼쪽 아래)으로
   const tail = {
-    p1: `${bx - 12},${by + rh - 2}`, p2: `${bx},${by + rh + 22}`, p3: `${bx + 12},${by + rh - 2}`,
-    d1: `${bx - 10},${by + rh - 1}`, d2: `${bx},${by + rh + 16}`,  d3: `${bx + 10},${by + rh - 1}`,
+    p1: `${bx - 20},${by + rh - 4}`, p2: `${bx - 48},${by + rh + 26}`, p3: `${bx - 4},${by + rh - 10}`,
+    d1: `${bx - 19},${by + rh - 3}`, d2: `${bx - 42},${by + rh + 18}`,  d3: `${bx - 5},${by + rh - 9}`,
   };
 
   return (
