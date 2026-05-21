@@ -117,7 +117,7 @@ const ACTIVITIES = [
 ];
 
 const INITIAL = {
-  babyInfo: { babyName: "", babyNamePromptDone: false, dueDate: "", motherName: "", fatherName: "", firstFoundDate: "", firstFeeling: "", firstLetter: "", introCompleted: false, coverMood: "사랑", coverBg: "garden", coverChar: "family", coverActivity: "태담" },
+  babyInfo: { babyName: "", babyNamePromptDone: false, dueDate: "", motherName: "", fatherName: "", firstFoundDate: "", firstFeeling: "", firstLetter: "", introCompleted: false, coverMood: "사랑", coverBg: "garden", coverChar: "mama_papa", coverActivity: "태담" },
   dailyRecords: [], activityRecords: [], hospitalRecords: [],
   checklistItems: [{ id: uid(), text: "출산 가방 준비하기", done: false }, { id: uid(), text: "아기 옷 세탁하기", done: false }, { id: uid(), text: "산후조리 계획 세우기", done: false }],
   bucketListItems: [{ id: uid(), text: "아기에게 첫 편지 쓰기", done: false }, { id: uid(), text: "부부가 함께 만삭 사진 찍기", done: false }]
