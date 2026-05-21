@@ -262,11 +262,11 @@ function FamilyIllustration({ character, mood }) {
   if (characterSrc) {
     const fadeId = `char-fade-${character}`;
     return (
-      <g transform="translate(0 -26)">
+      <g transform="translate(0 30)">
         <defs>
           <linearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#fff" stopOpacity="1" />
-            <stop offset="68%" stopColor="#fff" stopOpacity="1" />
+            <stop offset="62%" stopColor="#fff" stopOpacity="1" />
             <stop offset="100%" stopColor="#fff" stopOpacity="0" />
           </linearGradient>
           <mask id={`mask-${character}`}>
@@ -317,54 +317,30 @@ function FamilyIllustration({ character, mood }) {
 function ActivityLayer({ activity, mood }) {
   const a = getActivity(activity);
   const m = getMood(mood);
-  const activitySrc = ACTIVITY_ASSETS[activity];
-  const crop = ACTIVITY_CROPS[activity] || ACTIVITY_CROPS["운동"];
-  const fadeId = `act-fade-${activity}`;
-  const maskId = `act-mask-${activity}`;
 
-  if (activitySrc) {
-    return (
-      <g>
-        <defs>
-          <linearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor="#fff" stopOpacity="1" />
-            <stop offset="60%"  stopColor="#fff" stopOpacity="1" />
-            <stop offset="100%" stopColor="#fff" stopOpacity="0" />
-          </linearGradient>
-          <mask id={maskId}>
-            <rect x="78" y="120" width="264" height="152" fill={`url(#${fadeId})`} />
-          </mask>
-        </defs>
-        <ellipse cx="210" cy="258" rx="130" ry="10" fill={m.accent} opacity=".18" />
-        <svg
-          x="78"
-          y="120"
-          width="264"
-          height="152"
-          viewBox={`${crop.x} ${crop.y} ${crop.w} ${crop.h}`}
-          preserveAspectRatio="xMidYMid meet"
-          overflow="visible"
-          mask={`url(#${maskId})`}
-        >
-          <image
-            href={activitySrc}
-            x="0"
-            y="0"
-            width="1536"
-            height="1024"
-            preserveAspectRatio="xMidYMid meet"
-          />
-        </svg>
-      </g>
-    );
-  }
+  // 말풍선: 캐릭터 머리 위 오른쪽
+  const bx = 300; // 중심 x
+  const by = 52;  // 중심 y
+  const rw = 56;  // 가로 반지름
+  const rh = 38;  // 세로 반지름
 
   return (
-    <g transform="translate(210 210)">
-      <rect x="-54" y="-34" width="108" height="58" rx="28" fill="#fff" opacity=".88" />
-      <text x="0" y="8" textAnchor="middle" fontSize="34" fill={m.deep}>
-        {a.emoji}
-      </text>
+    <g>
+      {/* 말풍선 그림자 */}
+      <ellipse cx={bx + 2} cy={by + rh + 6} rx={rw - 8} ry={6} fill="#000" opacity=".07" />
+      {/* 말풍선 본체 */}
+      <rect x={bx - rw} y={by - rh} width={rw * 2} height={rh * 2} rx={rh} fill="#fff" opacity=".94" />
+      {/* 무드 색 테두리 */}
+      <rect x={bx - rw} y={by - rh} width={rw * 2} height={rh * 2} rx={rh} fill="none" stroke={m.accent} strokeWidth="2.5" opacity=".6" />
+      {/* 꼬리 */}
+      <polygon points={`${bx - 22},${by + rh - 2} ${bx - 36},${by + rh + 20} ${bx - 4},${by + rh - 8}`} fill="#fff" opacity=".94" />
+      <polygon points={`${bx - 22},${by + rh - 2} ${bx - 36},${by + rh + 20} ${bx - 4},${by + rh - 8}`} fill="none" stroke={m.accent} strokeWidth="2.5" strokeLinejoin="round" opacity=".6" />
+      {/* 꼬리 덮개 */}
+      <polygon points={`${bx - 22},${by + rh - 1} ${bx - 32},${by + rh + 15} ${bx - 5},${by + rh - 7}`} fill="#fff" opacity=".94" />
+      {/* 이모지 */}
+      <text x={bx} y={by - 4} textAnchor="middle" fontSize="22">{a.emoji}</text>
+      {/* 활동명 */}
+      <text x={bx} y={by + 20} textAnchor="middle" fontSize="13" fontWeight="600" fill={m.deep} fontFamily="'Gowun Dodum', 'Noto Sans KR', sans-serif">{a.label}</text>
     </g>
   );
 }
