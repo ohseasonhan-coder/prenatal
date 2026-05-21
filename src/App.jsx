@@ -335,7 +335,8 @@ function ActivityLayer({ activity, mood, character = "family" }) {
   };
   const head = MOM_HEAD[character] || { hx: 251, hy: 148 };
   const bx = Math.min(Math.max(head.hx, 56), 364);
-  const by = Math.max(head.hy - 40 - 42, 8); // 머리 위로 (rh + 여백 40px)
+  // 꼬리 끝(by + rh + 22)이 엄마 머리(hy)보다 살짝 위 → by = hy - rh - 22 - 여백
+  const by = Math.max(head.hy - 40 - 22 - 30, 8);
   const tailLeft = false; // 꼬리는 항상 아래쪽 (엄마 머리 위에 뜨므로)
 
   const rw = 52;
