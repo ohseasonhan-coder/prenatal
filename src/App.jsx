@@ -319,13 +319,23 @@ function ActivityLayer({ activity, mood }) {
   const m = getMood(mood);
   const activitySrc = ACTIVITY_ASSETS[activity];
   const crop = ACTIVITY_CROPS[activity] || ACTIVITY_CROPS["운동"];
+  const fadeId = `act-fade-${activity}`;
+  const maskId = `act-mask-${activity}`;
 
-  // 모든 activity PNG를 운동 이미지와 비슷한 체감 크기로 맞추기 위해
-  // 투명 여백을 viewBox로 잘라낸 뒤 같은 박스에 배치합니다.
   if (activitySrc) {
     return (
       <g>
-        <ellipse cx="210" cy="246" rx="176" ry="17" fill="#000" opacity=".045" />
+        <defs>
+          <linearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stopColor="#fff" stopOpacity="1" />
+            <stop offset="60%"  stopColor="#fff" stopOpacity="1" />
+            <stop offset="100%" stopColor="#fff" stopOpacity="0" />
+          </linearGradient>
+          <mask id={maskId}>
+            <rect x="78" y="120" width="264" height="152" fill={`url(#${fadeId})`} />
+          </mask>
+        </defs>
+        <ellipse cx="210" cy="258" rx="130" ry="10" fill={m.accent} opacity=".18" />
         <svg
           x="78"
           y="120"
@@ -334,6 +344,7 @@ function ActivityLayer({ activity, mood }) {
           viewBox={`${crop.x} ${crop.y} ${crop.w} ${crop.h}`}
           preserveAspectRatio="xMidYMid meet"
           overflow="visible"
+          mask={`url(#${maskId})`}
         >
           <image
             href={activitySrc}
