@@ -314,25 +314,35 @@ function FamilyIllustration({ character, mood }) {
   return <><Dad/><Mom/><Baby/><Child/></>;
 }
 
-function ActivityLayer({ activity, mood }) {
+function ActivityLayer({ activity, mood, character = "family" }) {
   const a = getActivity(activity);
   const m = getMood(mood);
   const activitySrc = ACTIVITY_ASSETS[activity];
   const crop = ACTIVITY_CROPS[activity] || ACTIVITY_CROPS["운동"];
 
-  const bx = 300;
-  const by = 52;
-  const rw = 60;
-  const rh = 44;
-  const clipId = `act-clip-${activity}`;
+  // 캐릭터별 말풍선 위치 — 인물과 겹치지 않도록 조정
+  const BUBBLE_POS = {
+    family:       { bx: 52,  by: 44 },
+    couple_baby:  { bx: 52,  by: 44 },
+    mama_papa:    { bx: 52,  by: 44 },
+    mama_friend:  { bx: 52,  by: 44 },
+    mama_grandma: { bx: 52,  by: 44 },
+    mama:         { bx: 368, by: 44 },
+    mama_pet:     { bx: 368, by: 44 },
+    mama_cat:     { bx: 368, by: 44 },
+  };
+  const { bx, by } = BUBBLE_POS[character] || { bx: 368, by: 44 };
+  const tailLeft = bx < 210; // 왼쪽 배치면 꼬리를 오른쪽으로
 
-  // 말풍선 내부 이미지 영역
-  const imgX = bx - rw + 5;
-  const imgY = by - rh + 5;
-  const imgW = rw * 2 - 10;
-  const imgH = rh * 2 - 10;
+  const rw = 52;
+  const rh = 40;
+  const clipId = `act-clip-${activity}-${character}`;
 
-  // crop 비율을 유지하며 imgW x imgH 안에 meet으로 배치
+  const imgX = bx - rw + 4;
+  const imgY = by - rh + 4;
+  const imgW = rw * 2 - 8;
+  const imgH = rh * 2 - 8;
+
   const scaleX = imgW / crop.w;
   const scaleY = imgH / crop.h;
   const scale  = Math.min(scaleX, scaleY);
@@ -341,41 +351,43 @@ function ActivityLayer({ activity, mood }) {
   const drawX  = imgX + (imgW - crop.w * scale) / 2 - crop.x * scale;
   const drawY  = imgY + (imgH - crop.h * scale) / 2 - crop.y * scale;
 
+  // 꼬리 포인트: 왼쪽 배치면 오른쪽 하단, 오른쪽 배치면 왼쪽 하단
+  const tail = tailLeft
+    ? { p1: `${bx + 18},${by + rh - 2}`, p2: `${bx + 34},${by + rh + 20}`, p3: `${bx + 2},${by + rh - 8}`,
+        d1: `${bx + 18},${by + rh - 1}`, d2: `${bx + 30},${by + rh + 14}`, d3: `${bx + 3},${by + rh - 7}` }
+    : { p1: `${bx - 18},${by + rh - 2}`, p2: `${bx - 34},${by + rh + 20}`, p3: `${bx - 2},${by + rh - 8}`,
+        d1: `${bx - 18},${by + rh - 1}`, d2: `${bx - 30},${by + rh + 14}`, d3: `${bx - 3},${by + rh - 7}` };
+
   return (
     <g>
       <defs>
         <clipPath id={clipId}>
-          <rect x={imgX} y={imgY} width={imgW} height={imgH} rx={rh - 5} />
+          <rect x={imgX} y={imgY} width={imgW} height={imgH} rx={rh - 4} />
         </clipPath>
       </defs>
 
       {/* 1. 그림자 */}
-      <ellipse cx={bx + 2} cy={by + rh + 6} rx={rw - 10} ry={6} fill="#000" opacity=".07" />
+      <ellipse cx={bx} cy={by + rh + 6} rx={rw - 10} ry={5} fill="#000" opacity=".07" />
 
       {/* 2. 말풍선 흰 배경 */}
       <rect x={bx - rw} y={by - rh} width={rw * 2} height={rh * 2} rx={rh} fill="#fff" opacity=".96" />
 
       {/* 3. 꼬리 흰 배경 */}
-      <polygon points={`${bx - 22},${by + rh - 2} ${bx - 38},${by + rh + 22} ${bx - 2},${by + rh - 8}`} fill="#fff" opacity=".96" />
+      <polygon points={`${tail.p1} ${tail.p2} ${tail.p3}`} fill="#fff" opacity=".96" />
 
-      {/* 4. 활동 이미지 — clipPath로 말풍선 안에 가둠 */}
+      {/* 4. 활동 이미지 */}
       {activitySrc ? (
-        <image
-          href={activitySrc}
-          x={drawX} y={drawY}
-          width={drawW} height={drawH}
-          clipPath={`url(#${clipId})`}
-        />
+        <image href={activitySrc} x={drawX} y={drawY} width={drawW} height={drawH} clipPath={`url(#${clipId})`} />
       ) : (
-        <text x={bx} y={by + 8} textAnchor="middle" fontSize="26">{a.emoji}</text>
+        <text x={bx} y={by + 8} textAnchor="middle" fontSize="24">{a.emoji}</text>
       )}
 
-      {/* 5. 무드 테두리 — 이미지 위에 덮어 경계 마감 */}
+      {/* 5. 무드 테두리 */}
       <rect x={bx - rw} y={by - rh} width={rw * 2} height={rh * 2} rx={rh} fill="none" stroke={m.accent} strokeWidth="2.5" opacity=".65" />
 
       {/* 6. 꼬리 테두리 + 덮개 */}
-      <polygon points={`${bx - 22},${by + rh - 2} ${bx - 38},${by + rh + 22} ${bx - 2},${by + rh - 8}`} fill="none" stroke={m.accent} strokeWidth="2.5" strokeLinejoin="round" opacity=".65" />
-      <polygon points={`${bx - 21},${by + rh - 1} ${bx - 34},${by + rh + 16} ${bx - 3},${by + rh - 7}`} fill="#fff" opacity=".96" />
+      <polygon points={`${tail.p1} ${tail.p2} ${tail.p3}`} fill="none" stroke={m.accent} strokeWidth="2.5" strokeLinejoin="round" opacity=".65" />
+      <polygon points={`${tail.d1} ${tail.d2} ${tail.d3}`} fill="#fff" opacity=".96" />
     </g>
   );
 }
@@ -383,7 +395,7 @@ function ActivityLayer({ activity, mood }) {
 function SceneComposer({ mood = "사랑", bg = "garden", character = "family", activity = "태담", small = false, large = false, editable = false, onEdit }) {
   const m = getMood(mood);
   const gradId = useMemo(() => `grad-${uid().replace(/[^a-zA-Z0-9]/g, "")}`, []);
-  return <div className={`scene ${small ? "scene-small" : ""} ${large ? "scene-large" : ""}`}><svg viewBox="0 0 420 260" role="img" aria-label="태교 일러스트"><defs><linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={m.sky[0]}/><stop offset="100%" stopColor={m.sky[1]}/></linearGradient></defs><g><rect width="420" height="260" fill={`url(#${gradId})`}/><BackgroundLayer bg={bg} mood={mood}/><path d="M210 70 C255 10 358 40 360 116 C362 185 286 214 210 235 C134 214 58 185 60 116 C62 40 165 10 210 70 Z" fill={m.accent} opacity=".42"/><LeafDecor mood={mood}/><MoodFx mood={mood}/><FamilyIllustration character={character} mood={mood}/><ActivityLayer activity={activity} mood={mood}/></g></svg>{editable && <button className="edit-float" type="button" onClick={onEdit} aria-label="그림 수정">✏️</button>}</div>;
+  return <div className={`scene ${small ? "scene-small" : ""} ${large ? "scene-large" : ""}`}><svg viewBox="0 0 420 260" role="img" aria-label="태교 일러스트"><defs><linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={m.sky[0]}/><stop offset="100%" stopColor={m.sky[1]}/></linearGradient></defs><g><rect width="420" height="260" fill={`url(#${gradId})`}/><BackgroundLayer bg={bg} mood={mood}/><path d="M210 70 C255 10 358 40 360 116 C362 185 286 214 210 235 C134 214 58 185 60 116 C62 40 165 10 210 70 Z" fill={m.accent} opacity=".42"/><LeafDecor mood={mood}/><MoodFx mood={mood}/><FamilyIllustration character={character} mood={mood}/><ActivityLayer activity={activity} mood={mood} character={character}/></g></svg>{editable && <button className="edit-float" type="button" onClick={onEdit} aria-label="그림 수정">✏️</button>}</div>;
 }
 function PhotoSlot({ photo, onPhoto, onRemove, small = false }) {
   const { ref, trigger, onChange } = usePhotoUpload(onPhoto);
