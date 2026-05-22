@@ -922,20 +922,56 @@ async function exportPDF(data) {
   pdf.addImage(coverCanvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, W, H);
 
   // ── 기록 페이지 ──
-  // SVG 씬을 base64 PNG로 변환하는 헬퍼
+  // SVG 안의 <image> href를 base64로 인라인화한 뒤 캔버스로 변환
   const svgToDataUrl = async (recordId) => {
     try {
       const article = document.getElementById(`record-${recordId}`);
       if (!article) return null;
-      const sceneEl = article.querySelector(".scene");
-      if (!sceneEl) return null;
-      const h2c = await loadHtml2Canvas();
-      const canvas = await h2c(sceneEl, {
-        scale: 2, useCORS: true, allowTaint: true,
-        backgroundColor: null, logging: false,
+      const sceneDiv = article.querySelector(".scene");
+      if (!sceneDiv) return null;
+      const svgEl = sceneDiv.querySelector("svg");
+      if (!svgEl) return null;
+
+      // SVG 클론
+      const clone = svgEl.cloneNode(true);
+      const images = clone.querySelectorAll("image");
+
+      // 각 <image href> 를 fetch → base64로 교체
+      await Promise.all([...images].map(async (img) => {
+        const href = img.getAttribute("href") || img.getAttribute("xlink:href");
+        if (!href) return;
+        try {
+          const res = await fetch(href);
+          const blob = await res.blob();
+          const b64 = await new Promise(rv => {
+            const fr = new FileReader(); fr.onload = () => rv(fr.result); fr.readAsDataURL(blob);
+          });
+          img.setAttribute("href", b64);
+        } catch(e) { /* 실패 시 그냥 둠 */ }
+      }));
+
+      // SVG → Blob URL → Image → Canvas
+      const svgStr = new XMLSerializer().serializeToString(clone);
+      const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const vb = svgEl.viewBox.baseVal;
+      const W = vb.width || 420, H = vb.height || 260;
+
+      return await new Promise((res) => {
+        const img = new Image();
+        img.onload = () => {
+          const cvs = document.createElement("canvas");
+          cvs.width = W * 2; cvs.height = H * 2;
+          const ctx = cvs.getContext("2d");
+          ctx.scale(2, 2);
+          ctx.drawImage(img, 0, 0, W, H);
+          URL.revokeObjectURL(url);
+          res(cvs.toDataURL("image/png"));
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); res(null); };
+        img.src = url;
       });
-      return canvas.toDataURL("image/png");
-    } catch (e) { return null; }
+    } catch(e) { console.error(e); return null; }
   };
 
   for (let i = 0; i < records.length; i++) {
