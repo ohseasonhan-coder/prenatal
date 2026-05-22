@@ -416,7 +416,17 @@ function ActivityLayer({ activity, mood, character = "family" }) {
 function SceneComposer({ mood = "사랑", bg = "garden", character = "family", activity = "태담", small = false, large = false, editable = false, onEdit }) {
   const m = getMood(mood);
   const gradId = useMemo(() => `grad-${uid().replace(/[^a-zA-Z0-9]/g, "")}`, []);
-  return <div className={`scene ${small ? "scene-small" : ""} ${large ? "scene-large" : ""}`}><svg viewBox="0 0 420 260" role="img" aria-label="태교 일러스트"><defs><linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={m.sky[0]}/><stop offset="100%" stopColor={m.sky[1]}/></linearGradient></defs><g><rect width="420" height="260" fill={`url(#${gradId})`}/><BackgroundLayer bg={bg} mood={mood}/><path d="M210 70 C255 10 358 40 360 116 C362 185 286 214 210 235 C134 214 58 185 60 116 C62 40 165 10 210 70 Z" fill={m.accent} opacity=".42"/><LeafDecor mood={mood}/><MoodFx mood={mood}/><FamilyIllustration character={character} mood={mood}/><ActivityLayer activity={activity} mood={mood} character={character}/></g></svg>{editable && <button className="edit-float" type="button" onClick={onEdit} aria-label="그림 수정">✏️</button>}</div>;
+  const sceneRef = React.useRef(null);
+  const [sharing, setSharing] = React.useState(false);
+  const handleShare = async (e) => {
+    e.stopPropagation();
+    if (sharing) return;
+    setSharing(true);
+    try { const canvas = await captureElement(sceneRef.current); await shareImage(canvas, "태교씬.png"); }
+    catch(err) { console.error(err); }
+    finally { setSharing(false); }
+  };
+  return <div className={`scene ${small ? "scene-small" : ""} ${large ? "scene-large" : ""}`} ref={sceneRef}><svg viewBox="0 0 420 260" role="img" aria-label="태교 일러스트"><defs><linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={m.sky[0]}/><stop offset="100%" stopColor={m.sky[1]}/></linearGradient></defs><g><rect width="420" height="260" fill={`url(#${gradId})`}/><BackgroundLayer bg={bg} mood={mood}/><path d="M210 70 C255 10 358 40 360 116 C362 185 286 214 210 235 C134 214 58 185 60 116 C62 40 165 10 210 70 Z" fill={m.accent} opacity=".42"/><LeafDecor mood={mood}/><MoodFx mood={mood}/><FamilyIllustration character={character} mood={mood}/><ActivityLayer activity={activity} mood={mood} character={character}/></g></svg>{editable && <button className="edit-float" type="button" onClick={onEdit} aria-label="그림 수정">✏️</button>}{!small && <button className="share-float" type="button" onClick={handleShare} disabled={sharing} aria-label="공유">{sharing ? "⏳" : "📤"}</button>}</div>;
 }
 function PhotoSlot({ photo, onPhoto, onRemove, small = false }) {
   const { ref, trigger, onChange } = usePhotoUpload(onPhoto);
@@ -715,16 +725,129 @@ function Write({ data, setData, writeTab, setWriteTab, setTab }) {
 function Book({ data, setData }) {
   const remove = (key, id) => setData((p) => ({ ...p, [key]: p[key].filter((item) => item.id !== id) }));
   const records = [...data.dailyRecords.map((r) => ({ ...r, type: "daily" })), ...data.activityRecords.map((r) => ({ ...r, type: "activity" })), ...data.hospitalRecords.map((r) => ({ ...r, type: "hospital" }))].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  return <main className="screen"><section className="book-cover card"><SceneComposer mood={data.babyInfo.coverMood} bg={data.babyInfo.coverBg} character={data.babyInfo.coverChar} activity={data.babyInfo.coverActivity}/><div><h2>{data.babyInfo.babyName || "우리 아기"}를 기다리며</h2><p>{data.babyInfo.dueDate ? `출산 예정일 ${fmtDate(data.babyInfo.dueDate)}` : "출산 예정일을 입력해보세요."}</p></div></section>{records.length === 0 ? <div className="empty card">아직 저장된 기록이 없어요.<br/>오늘의 태교 장면을 먼저 기록해보세요.</div> : records.map((r) => { const key = r.type === "daily" ? "dailyRecords" : r.type === "activity" ? "activityRecords" : "hospitalRecords"; return <article className="record card" key={`${r.type}-${r.id}`}><div className="record-top"><div><strong>{r.type === "daily" ? "임신 주차 기록" : r.type === "activity" ? "태교 활동" : "병원 기록"}</strong><p>{fmtDate(r.date)} {r.week ? `· ${r.week}` : ""}</p></div><button onClick={() => remove(key, r.id)}>삭제</button></div>{r.photo ? <PhotoSlot photo={r.photo} small/> : r.type === "hospital" ? <SceneComposer mood={r.mood || "편안함"} bg={r.bg || "clinic"} character={r.character || "mama"} activity={r.activity || "초음파"} small/> : <SceneComposer mood={r.mood || "사랑"} bg={r.bg || "garden"} character={r.character || "family"} activity={r.activity || "태담"} small/>}{r.activity && <span className="tag">{getActivity(r.activity).emoji} {getActivity(r.activity).label}</span>}{r.condition && <span className="tag">{r.condition}</span>}{r.checkup && <p>{r.checkup}</p>}{r.feeling && <p>{r.feeling}</p>}{r.message && <blockquote>{r.message}</blockquote>}{r.memory && <p className="muted-text">{r.memory}</p>}{r.memo && <p className="muted-text">{r.memo}</p>}</article>; })}</main>;
+  return <main className="screen"><section className="book-cover card"><SceneComposer mood={data.babyInfo.coverMood} bg={data.babyInfo.coverBg} character={data.babyInfo.coverChar} activity={data.babyInfo.coverActivity}/><div><h2>{data.babyInfo.babyName || "우리 아기"}를 기다리며</h2><p>{data.babyInfo.dueDate ? `출산 예정일 ${fmtDate(data.babyInfo.dueDate)}` : "출산 예정일을 입력해보세요."}</p></div></section>{records.length === 0 ? <div className="empty card">아직 저장된 기록이 없어요.<br/>오늘의 태교 장면을 먼저 기록해보세요.</div> : records.map((r) => { const key = r.type === "daily" ? "dailyRecords" : r.type === "activity" ? "activityRecords" : "hospitalRecords"; return <article className="record card" key={`${r.type}-${r.id}`} id={`record-${r.id}`}><div className="record-top"><div><strong>{r.type === "daily" ? "임신 주차 기록" : r.type === "activity" ? "태교 활동" : "병원 기록"}</strong><p>{fmtDate(r.date)} {r.week ? `· ${r.week}` : ""}</p></div><div style={{display:"flex",gap:"6px",alignItems:"center"}}><button onClick={async () => { const el = document.getElementById(`record-${r.id}`); const canvas = await captureElement(el); await shareImage(canvas, `태교기록_${r.date}.png`); }} style={{background:"rgba(255,255,255,.8)",border:"1px solid rgba(164,122,142,.18)",borderRadius:"13px",cursor:"pointer",fontSize:"13px",padding:"6px 10px",fontWeight:"800",color:"#8b707c"}} title="카드 이미지 공유">📤 공유</button><button onClick={async () => { await shareStoryCard(r, data.babyInfo.babyName); }} style={{background:"linear-gradient(135deg,#f27ea5,#a78bfa)",border:"none",borderRadius:"13px",cursor:"pointer",fontSize:"13px",padding:"6px 10px",fontWeight:"800",color:"#fff"}} title="인스타 스토리용 이미지">📸 스토리</button><button onClick={() => remove(key, r.id)} style={{background:"rgba(255,255,255,.7)",border:"1px solid rgba(164,122,142,.18)",borderRadius:"13px",padding:"7px 10px",fontSize:"12px",fontWeight:"800",color:"#8b707c"}}>삭제</button></div></div>{r.photo ? <PhotoSlot photo={r.photo} small/> : r.type === "hospital" ? <SceneComposer mood={r.mood || "편안함"} bg={r.bg || "clinic"} character={r.character || "mama"} activity={r.activity || "초음파"} small/> : <SceneComposer mood={r.mood || "사랑"} bg={r.bg || "garden"} character={r.character || "family"} activity={r.activity || "태담"} small/>}{r.activity && <span className="tag">{getActivity(r.activity).emoji} {getActivity(r.activity).label}</span>}{r.condition && <span className="tag">{r.condition}</span>}{r.checkup && <p>{r.checkup}</p>}{r.feeling && <p>{r.feeling}</p>}{r.message && <blockquote>{r.message}</blockquote>}{r.memory && <p className="muted-text">{r.memory}</p>}{r.memo && <p className="muted-text">{r.memo}</p>}</article>; })}</main>;
 }
+// ── 공유 유틸 ──────────────────────────────────────────
+async function loadHtml2Canvas() {
+  return new Promise((res, rej) => {
+    if (window.html2canvas) return res(window.html2canvas);
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+    s.onload = () => res(window.html2canvas); s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+async function captureElement(el) {
+  const h2c = await loadHtml2Canvas();
+  return h2c(el, { scale: 2, useCORS: true, backgroundColor: null, logging: false });
+}
+
+async function shareImage(canvas, filename = "태교북_공유.png") {
+  return new Promise((resolve) => {
+    canvas.toBlob(async (blob) => {
+      // Web Share API (모바일 카카오톡/인스타 등)
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: "image/png" })] })) {
+        try {
+          await navigator.share({ files: [new File([blob], filename, { type: "image/png" })], title: "태교북 공유" });
+          resolve("shared");
+          return;
+        } catch (e) { /* 취소 또는 미지원 시 다운로드로 fallback */ }
+      }
+      // fallback: 이미지 다운로드
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = filename;
+      a.click(); URL.revokeObjectURL(url);
+      resolve("downloaded");
+    }, "image/png");
+  });
+}
+
+
+// ── 인스타 스토리 카드 생성 (9:16) ──────────────────────
+async function shareStoryCard(r, babyName) {
+  const MOOD_COLORS = {
+    "사랑":"#f27ea5","설렘":"#f4a261","차분함":"#9b8ec4",
+    "편안함":"#6ab8c8","기쁨":"#f7d26e","평온":"#7dba8e",
+  };
+  const TYPE_LABELS = { daily:"임신 주차 기록", activity:"태교 활동", hospital:"병원 기록" };
+  const TYPE_EMOJIS = { daily:"📝", activity:"🌿", hospital:"🏥" };
+  const accent = MOOD_COLORS[r.mood] || "#f27ea5";
+  const light  = accent + "22";
+
+  // 9:16 = 1080x1920 기준, 렌더는 540x960으로 scale:2
+  const el = document.createElement("div");
+  el.style.cssText = [
+    "width:540px", "height:960px", "position:fixed",
+    "left:-9999px", "top:0", "overflow:hidden",
+    `background:linear-gradient(160deg,${light} 0%,#fff 60%,${light} 100%)`,
+    "font-family:'Noto Sans KR',system-ui,sans-serif",
+    "display:flex", "flex-direction:column",
+    "align-items:center", "justify-content:center",
+    "padding:56px 48px", "box-sizing:border-box",
+  ].join(";");
+
+  el.innerHTML = `
+    <div style="width:100%;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;">
+      <!-- 상단 브랜드 -->
+      <p style="font-size:13px;font-weight:900;color:${accent};letter-spacing:.12em;margin:0 0 18px;opacity:.8;">
+        💗 ${babyName || "우리 아기"}의 태교북
+      </p>
+
+      <!-- 씬 카드 -->
+      <div style="width:100%;border-radius:32px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.12);margin-bottom:32px;">
+        <img
+          src="${r.sceneThumb || ""}"
+          style="width:100%;aspect-ratio:420/260;object-fit:cover;display:${r.sceneThumb ? "block" : "none"};"
+        />
+        <div style="width:100%;aspect-ratio:420/260;background:linear-gradient(135deg,${light},${accent}33);display:${r.sceneThumb ? "none" : "grid"};place-items:center;font-size:72px;">
+          ${TYPE_EMOJIS[r.type] || "📝"}
+        </div>
+      </div>
+
+      <!-- 타입 + 날짜 -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <span style="background:${accent};color:#fff;border-radius:999px;padding:5px 16px;font-size:13px;font-weight:900;">${TYPE_EMOJIS[r.type]} ${TYPE_LABELS[r.type]}</span>
+        <span style="color:#999;font-size:13px;font-weight:700;">${r.date || ""}${r.week ? " · " + r.week : ""}</span>
+      </div>
+
+      <!-- 무드 태그 -->
+      ${r.mood ? `<span style="display:inline-block;background:${light};color:${accent};border:1.5px solid ${accent}55;border-radius:999px;padding:5px 18px;font-size:13px;font-weight:900;margin-bottom:20px;">${r.mood}</span>` : ""}
+
+      <!-- 메인 텍스트 -->
+      ${(r.message || r.feeling || r.memo) ? `
+        <div style="width:100%;background:rgba(255,255,255,.82);border-radius:24px;padding:24px 28px;border-left:5px solid ${accent};box-shadow:0 8px 28px rgba(0,0,0,.06);margin-bottom:16px;">
+          <p style="font-size:13px;color:${accent};font-weight:900;margin:0 0 10px;">
+            ${r.message ? "아기에게 한마디" : r.feeling ? "오늘의 느낌" : "메모"}
+          </p>
+          <p style="font-size:16px;line-height:1.75;color:#3f3138;margin:0;word-break:keep-all;">
+            ${(r.message || r.feeling || r.memo).slice(0, 120)}${(r.message || r.feeling || r.memo).length > 120 ? "..." : ""}
+          </p>
+        </div>
+      ` : ""}
+
+      <!-- 컨디션 / 병원 -->
+      ${r.condition ? `<p style="font-size:14px;color:#8b707c;margin:0 0 8px;">컨디션 · ${r.condition}</p>` : ""}
+      ${r.hospital ? `<p style="font-size:14px;color:#8b707c;margin:0 0 8px;">병원 · ${r.hospital}</p>` : ""}
+
+      <!-- 하단 브랜드 -->
+      <p style="font-size:11px;color:#ccc;margin:24px 0 0;letter-spacing:.06em;">Prenatal Story Book</p>
+    </div>
+  `;
+
+  document.body.appendChild(el);
+  const h2c = await loadHtml2Canvas();
+  const canvas = await h2c(el, { scale: 2, useCORS: true, backgroundColor: null, logging: false });
+  document.body.removeChild(el);
+  await shareImage(canvas, `태교스토리_${r.date || "기록"}.png`);
+}
+
 async function exportPDF(data) {
-  // jsPDF + html2canvas 동적 로드
   const loadScript = (src) => new Promise((res, rej) => {
     if (document.querySelector(`script[src="${src}"]`)) return res();
     const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej;
     document.head.appendChild(s);
   });
-  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
   await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
   const { jsPDF } = window.jspdf;
 
@@ -734,62 +857,155 @@ async function exportPDF(data) {
     ...data.dailyRecords.map(r => ({ ...r, type: "daily" })),
     ...data.activityRecords.map(r => ({ ...r, type: "activity" })),
     ...data.hospitalRecords.map(r => ({ ...r, type: "hospital" })),
-  ].sort((a, b) => new Date(a.date) - new Date(b.date));
+  ].sort((a, c) => new Date(a.date) - new Date(c.date));
 
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const W = 210, H = 297;
+  const W = 210, H = 297, M = 20;
+
+  const MOOD_COLORS = {
+    "사랑":[242,126,165],"설렘":[244,162,97],"차분함":[155,142,196],
+    "편안함":[106,184,200],"기쁨":[247,210,110],"평온":[125,186,142],
+  };
+  const TYPE_LABELS = { daily:"임신 주차 기록", activity:"태교 활동", hospital:"병원 기록" };
+  const TYPE_EMOJIS_TEXT = { daily:"[주차]", activity:"[활동]", hospital:"[병원]" };
+
+  // 텍스트 줄바꿈 헬퍼
+  const wrapText = (pdf, text, x, maxW, fontSize) => {
+    pdf.setFontSize(fontSize);
+    return pdf.splitTextToSize(String(text || ""), maxW);
+  };
 
   // ── 커버 페이지 ──
-  const coverEl = document.createElement("div");
-  coverEl.style.cssText = `width:794px;height:1123px;background:linear-gradient(160deg,#fde8f0,#fff5f9);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Noto Sans KR',sans-serif;padding:60px;box-sizing:border-box;`;
-  coverEl.innerHTML = `
-    <div style="font-size:52px;margin-bottom:24px;">💗</div>
-    <h1 style="font-size:42px;color:#c0567a;margin:0 0 12px;font-weight:700;">${babyName}를 기다리며</h1>
-    <p style="font-size:20px;color:#e08ca8;margin:0 0 8px;">태교 일기</p>
-    ${b.dueDate ? `<p style="font-size:16px;color:#d4a0b5;margin:40px 0 0;">출산 예정일 · ${b.dueDate}</p>` : ""}
-    ${b.motherName ? `<p style="font-size:16px;color:#d4a0b5;margin:8px 0 0;">작성자 · ${b.motherName}</p>` : ""}
-    <div style="margin-top:60px;display:flex;gap:32px;font-size:15px;color:#c0567a;opacity:.7;">
-      <span>📝 주차기록 ${data.dailyRecords.length}개</span>
-      <span>🌿 활동기록 ${data.activityRecords.length}개</span>
-      <span>🏥 병원기록 ${data.hospitalRecords.length}개</span>
-    </div>
-  `;
-  document.body.appendChild(coverEl);
-  const coverCanvas = await html2canvas(coverEl, { scale: 1.5, useCORS: true, backgroundColor: null });
-  document.body.removeChild(coverEl);
-  pdf.addImage(coverCanvas.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, W, H);
+  // 배경 그라디언트 효과 (핑크 계열)
+  pdf.setFillColor(253, 232, 240);
+  pdf.rect(0, 0, W, H, "F");
+  pdf.setFillColor(255, 245, 249);
+  pdf.rect(0, H * 0.4, W, H * 0.6, "F");
+
+  // 장식 원
+  pdf.setFillColor(242, 126, 165);
+  pdf.setGState(new pdf.GState({ opacity: 0.08 }));
+  pdf.circle(W * 0.15, H * 0.1, 60, "F");
+  pdf.circle(W * 0.85, H * 0.85, 80, "F");
+  pdf.setGState(new pdf.GState({ opacity: 1 }));
+
+  // 제목
+  pdf.setTextColor(192, 86, 122);
+  pdf.setFontSize(32); pdf.setFont("helvetica", "bold");
+  pdf.text(`${babyName}${babyName.match(/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/) ? "를" : "의"} 기다리며`, W/2, H*0.38, { align:"center" });
+  pdf.setFontSize(16); pdf.setFont("helvetica", "normal");
+  pdf.setTextColor(224, 140, 168);
+  pdf.text("태교 일기", W/2, H*0.38+12, { align:"center" });
+
+  // 구분선
+  pdf.setDrawColor(242, 126, 165); pdf.setLineWidth(0.5);
+  pdf.line(M+20, H*0.38+18, W-M-20, H*0.38+18);
+
+  // 정보
+  pdf.setFontSize(12); pdf.setTextColor(180, 130, 155);
+  let infoY = H*0.38+30;
+  if (b.dueDate) { pdf.text(`출산 예정일  ${b.dueDate}`, W/2, infoY, { align:"center" }); infoY += 9; }
+  if (b.motherName) { pdf.text(`작성자  ${b.motherName}`, W/2, infoY, { align:"center" }); infoY += 9; }
+
+  // 통계
+  pdf.setFontSize(11); pdf.setTextColor(192, 86, 122);
+  const statsY = H*0.75;
+  [[`주차기록 ${data.dailyRecords.length}개`, W/2-45], [`활동기록 ${data.activityRecords.length}개`, W/2], [`병원기록 ${data.hospitalRecords.length}개`, W/2+45]].forEach(([t, x]) => {
+    pdf.setFillColor(255, 220, 235); pdf.roundedRect(x-22, statsY-6, 44, 12, 4, 4, "F");
+    pdf.setTextColor(192, 86, 122); pdf.text(t, x, statsY+2, { align:"center" });
+  });
+
+  // 하단
+  pdf.setFontSize(9); pdf.setTextColor(210, 180, 195);
+  pdf.text("Prenatal Story Book", W/2, H-12, { align:"center" });
 
   // ── 기록 페이지들 ──
-  const MOOD_COLORS = { "사랑":"#f27ea5","설렘":"#f4a261","차분함":"#9b8ec4","편안함":"#6ab8c8","기쁨":"#f7d26e","평온":"#7dba8e" };
-  const TYPE_LABELS = { daily:"임신 주차 기록", activity:"태교 활동", hospital:"병원 기록" };
-  const TYPE_EMOJIS = { daily:"📝", activity:"🌿", hospital:"🏥" };
-
   for (let i = 0; i < records.length; i++) {
-    const r = records[i];
-    const accent = MOOD_COLORS[r.mood] || "#f27ea5";
-    const el = document.createElement("div");
-    el.style.cssText = `width:794px;min-height:1123px;background:#fff;font-family:'Noto Sans KR',sans-serif;padding:64px;box-sizing:border-box;position:relative;`;
-    el.innerHTML = `
-      <div style="border-left:6px solid ${accent};padding-left:20px;margin-bottom:32px;">
-        <p style="font-size:13px;color:${accent};margin:0 0 4px;font-weight:600;">${TYPE_EMOJIS[r.type]} ${TYPE_LABELS[r.type]}</p>
-        <h2 style="font-size:28px;color:#3a2a32;margin:0;">${r.date || ""} ${r.week ? `· ${r.week}` : ""}</h2>
-      </div>
-      ${r.mood ? `<span style="display:inline-block;background:${accent}22;color:${accent};padding:4px 14px;border-radius:20px;font-size:13px;margin-bottom:8px;">${r.mood}</span>` : ""}
-      ${r.condition ? `<p style="color:#6a4a58;font-size:16px;margin:12px 0;"><strong>컨디션</strong> · ${r.condition}</p>` : ""}
-      ${r.hospital ? `<p style="color:#6a4a58;font-size:16px;margin:12px 0;"><strong>병원</strong> · ${r.hospital}</p>` : ""}
-      ${r.checkup ? `<p style="color:#6a4a58;font-size:16px;margin:12px 0;"><strong>검진 내용</strong> · ${r.checkup}</p>` : ""}
-      ${r.feeling ? `<div style="background:#fdf6f9;border-radius:12px;padding:20px;margin:16px 0;color:#5a3a48;font-size:16px;line-height:1.8;">${r.feeling}</div>` : ""}
-      ${r.message ? `<div style="background:#fdf6f9;border-radius:12px;padding:20px;margin:16px 0;border-left:4px solid ${accent};color:#5a3a48;font-size:16px;line-height:1.8;"><p style="font-size:12px;color:${accent};margin:0 0 8px;font-weight:600;">아기에게 한마디</p>${r.message}</div>` : ""}
-      ${r.memory ? `<div style="color:#8a6a78;font-size:15px;margin:16px 0;line-height:1.8;">${r.memory}</div>` : ""}
-      ${r.memo ? `<div style="color:#8a6a78;font-size:15px;margin:16px 0;line-height:1.8;">${r.memo}</div>` : ""}
-      <div style="position:absolute;bottom:40px;right:64px;font-size:13px;color:#ccc;">${i + 1} / ${records.length}</div>
-      <div style="position:absolute;bottom:40px;left:64px;font-size:13px;color:#ddd;">${babyName}의 태교북</div>
-    `;
-    document.body.appendChild(el);
-    const canvas = await html2canvas(el, { scale: 1.5, useCORS: true, backgroundColor: "#ffffff" });
-    document.body.removeChild(el);
     pdf.addPage();
-    pdf.addImage(canvas.toDataURL("image/jpeg", 0.88), "JPEG", 0, 0, W, H);
+    const r = records[i];
+    const ac = MOOD_COLORS[r.mood] || [242, 126, 165];
+
+    // 배경
+    pdf.setFillColor(255, 255, 255); pdf.rect(0, 0, W, H, "F");
+    pdf.setFillColor(ac[0], ac[1], ac[2]);
+    pdf.setGState(new pdf.GState({ opacity: 0.06 }));
+    pdf.rect(0, 0, W, H, "F");
+    pdf.setGState(new pdf.GState({ opacity: 1 }));
+
+    // 상단 컬러 바
+    pdf.setFillColor(ac[0], ac[1], ac[2]);
+    pdf.rect(0, 0, W, 2, "F");
+
+    // 타입 + 날짜
+    let y = M + 10;
+    pdf.setFillColor(ac[0], ac[1], ac[2]);
+    pdf.setGState(new pdf.GState({ opacity: 0.15 }));
+    pdf.roundedRect(M, y-5, 50, 10, 3, 3, "F");
+    pdf.setGState(new pdf.GState({ opacity: 1 }));
+    pdf.setFontSize(10); pdf.setFont("helvetica", "bold"); pdf.setTextColor(ac[0], ac[1], ac[2]);
+    pdf.text(TYPE_EMOJIS_TEXT[r.type] + " " + TYPE_LABELS[r.type], M+3, y+2);
+
+    // 날짜 + 주차
+    y += 14;
+    pdf.setFontSize(22); pdf.setFont("helvetica", "bold"); pdf.setTextColor(58, 42, 50);
+    pdf.text(`${r.date || "날짜 없음"}${r.week ? "  ·  " + r.week : ""}`, M, y);
+
+    // 구분선
+    y += 6;
+    pdf.setDrawColor(ac[0], ac[1], ac[2]); pdf.setLineWidth(0.8);
+    pdf.line(M, y, W-M, y);
+    y += 10;
+
+    // 무드 태그
+    if (r.mood) {
+      pdf.setFillColor(ac[0], ac[1], ac[2]);
+      pdf.setGState(new pdf.GState({ opacity: 0.15 }));
+      pdf.roundedRect(M, y-5, 30, 10, 5, 5, "F");
+      pdf.setGState(new pdf.GState({ opacity: 1 }));
+      pdf.setFontSize(11); pdf.setFont("helvetica", "normal"); pdf.setTextColor(ac[0], ac[1], ac[2]);
+      pdf.text(r.mood, M+4, y+2);
+      y += 14;
+    }
+
+    // 내용 필드 렌더 헬퍼
+    const addField = (label, value) => {
+      if (!value) return;
+      if (y > H - 30) return; // 페이지 넘침 방지
+      pdf.setFontSize(9); pdf.setFont("helvetica", "bold"); pdf.setTextColor(ac[0], ac[1], ac[2]);
+      pdf.text(label, M, y); y += 6;
+      pdf.setFont("helvetica", "normal"); pdf.setTextColor(80, 55, 65);
+      pdf.setFontSize(12);
+      const lines = wrapText(pdf, value, M, W - M*2, 12);
+      // 배경 박스
+      const boxH = lines.length * 7 + 10;
+      pdf.setFillColor(253, 246, 249);
+      pdf.setGState(new pdf.GState({ opacity: 0.8 }));
+      pdf.roundedRect(M, y-4, W-M*2, boxH, 4, 4, "F");
+      pdf.setGState(new pdf.GState({ opacity: 1 }));
+      // 왼쪽 강조선 (메시지만)
+      if (label === "아기에게 한마디") {
+        pdf.setFillColor(ac[0], ac[1], ac[2]);
+        pdf.rect(M, y-4, 2, boxH, "F");
+      }
+      pdf.setTextColor(80, 55, 65);
+      lines.forEach(line => { pdf.text(line, M+5, y+3); y += 7; });
+      y += 8;
+    };
+
+    addField("컨디션", r.condition);
+    addField("병원", r.hospital);
+    addField("검진 내용", r.checkup);
+    addField("오늘의 느낌", r.feeling);
+    addField("아기에게 한마디", r.message);
+    addField("오늘의 기억", r.memory);
+    addField("메모", r.memo);
+
+    // 하단 페이지 번호
+    pdf.setFontSize(9); pdf.setFont("helvetica", "normal"); pdf.setTextColor(200, 180, 190);
+    pdf.text(`${babyName}의 태교북`, M, H-8);
+    pdf.text(`${i + 1} / ${records.length}`, W-M, H-8, { align:"right" });
+    pdf.setDrawColor(230, 210, 220); pdf.setLineWidth(0.3);
+    pdf.line(M, H-12, W-M, H-12);
   }
 
   pdf.save(`${babyName}_태교북.pdf`);
