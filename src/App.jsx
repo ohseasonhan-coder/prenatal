@@ -717,10 +717,96 @@ function Book({ data, setData }) {
   const records = [...data.dailyRecords.map((r) => ({ ...r, type: "daily" })), ...data.activityRecords.map((r) => ({ ...r, type: "activity" })), ...data.hospitalRecords.map((r) => ({ ...r, type: "hospital" }))].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   return <main className="screen"><section className="book-cover card"><SceneComposer mood={data.babyInfo.coverMood} bg={data.babyInfo.coverBg} character={data.babyInfo.coverChar} activity={data.babyInfo.coverActivity}/><div><h2>{data.babyInfo.babyName || "우리 아기"}를 기다리며</h2><p>{data.babyInfo.dueDate ? `출산 예정일 ${fmtDate(data.babyInfo.dueDate)}` : "출산 예정일을 입력해보세요."}</p></div></section>{records.length === 0 ? <div className="empty card">아직 저장된 기록이 없어요.<br/>오늘의 태교 장면을 먼저 기록해보세요.</div> : records.map((r) => { const key = r.type === "daily" ? "dailyRecords" : r.type === "activity" ? "activityRecords" : "hospitalRecords"; return <article className="record card" key={`${r.type}-${r.id}`}><div className="record-top"><div><strong>{r.type === "daily" ? "임신 주차 기록" : r.type === "activity" ? "태교 활동" : "병원 기록"}</strong><p>{fmtDate(r.date)} {r.week ? `· ${r.week}` : ""}</p></div><button onClick={() => remove(key, r.id)}>삭제</button></div>{r.photo ? <PhotoSlot photo={r.photo} small/> : r.type === "hospital" ? <SceneComposer mood={r.mood || "편안함"} bg={r.bg || "clinic"} character={r.character || "mama"} activity={r.activity || "초음파"} small/> : <SceneComposer mood={r.mood || "사랑"} bg={r.bg || "garden"} character={r.character || "family"} activity={r.activity || "태담"} small/>}{r.activity && <span className="tag">{getActivity(r.activity).emoji} {getActivity(r.activity).label}</span>}{r.condition && <span className="tag">{r.condition}</span>}{r.checkup && <p>{r.checkup}</p>}{r.feeling && <p>{r.feeling}</p>}{r.message && <blockquote>{r.message}</blockquote>}{r.memory && <p className="muted-text">{r.memory}</p>}{r.memo && <p className="muted-text">{r.memo}</p>}</article>; })}</main>;
 }
-function Settings({ setData }) {
+async function exportPDF(data) {
+  // jsPDF + html2canvas 동적 로드
+  const loadScript = (src) => new Promise((res, rej) => {
+    if (document.querySelector(`script[src="${src}"]`)) return res();
+    const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
+  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+  const { jsPDF } = window.jspdf;
+
+  const b = data.babyInfo;
+  const babyName = b.babyName || "우리 아기";
+  const records = [
+    ...data.dailyRecords.map(r => ({ ...r, type: "daily" })),
+    ...data.activityRecords.map(r => ({ ...r, type: "activity" })),
+    ...data.hospitalRecords.map(r => ({ ...r, type: "hospital" })),
+  ].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const W = 210, H = 297;
+
+  // ── 커버 페이지 ──
+  const coverEl = document.createElement("div");
+  coverEl.style.cssText = `width:794px;height:1123px;background:linear-gradient(160deg,#fde8f0,#fff5f9);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Noto Sans KR',sans-serif;padding:60px;box-sizing:border-box;`;
+  coverEl.innerHTML = `
+    <div style="font-size:52px;margin-bottom:24px;">💗</div>
+    <h1 style="font-size:42px;color:#c0567a;margin:0 0 12px;font-weight:700;">${babyName}를 기다리며</h1>
+    <p style="font-size:20px;color:#e08ca8;margin:0 0 8px;">태교 일기</p>
+    ${b.dueDate ? `<p style="font-size:16px;color:#d4a0b5;margin:40px 0 0;">출산 예정일 · ${b.dueDate}</p>` : ""}
+    ${b.motherName ? `<p style="font-size:16px;color:#d4a0b5;margin:8px 0 0;">작성자 · ${b.motherName}</p>` : ""}
+    <div style="margin-top:60px;display:flex;gap:32px;font-size:15px;color:#c0567a;opacity:.7;">
+      <span>📝 주차기록 ${data.dailyRecords.length}개</span>
+      <span>🌿 활동기록 ${data.activityRecords.length}개</span>
+      <span>🏥 병원기록 ${data.hospitalRecords.length}개</span>
+    </div>
+  `;
+  document.body.appendChild(coverEl);
+  const coverCanvas = await html2canvas(coverEl, { scale: 1.5, useCORS: true, backgroundColor: null });
+  document.body.removeChild(coverEl);
+  pdf.addImage(coverCanvas.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, W, H);
+
+  // ── 기록 페이지들 ──
+  const MOOD_COLORS = { "사랑":"#f27ea5","설렘":"#f4a261","차분함":"#9b8ec4","편안함":"#6ab8c8","기쁨":"#f7d26e","평온":"#7dba8e" };
+  const TYPE_LABELS = { daily:"임신 주차 기록", activity:"태교 활동", hospital:"병원 기록" };
+  const TYPE_EMOJIS = { daily:"📝", activity:"🌿", hospital:"🏥" };
+
+  for (let i = 0; i < records.length; i++) {
+    const r = records[i];
+    const accent = MOOD_COLORS[r.mood] || "#f27ea5";
+    const el = document.createElement("div");
+    el.style.cssText = `width:794px;min-height:1123px;background:#fff;font-family:'Noto Sans KR',sans-serif;padding:64px;box-sizing:border-box;position:relative;`;
+    el.innerHTML = `
+      <div style="border-left:6px solid ${accent};padding-left:20px;margin-bottom:32px;">
+        <p style="font-size:13px;color:${accent};margin:0 0 4px;font-weight:600;">${TYPE_EMOJIS[r.type]} ${TYPE_LABELS[r.type]}</p>
+        <h2 style="font-size:28px;color:#3a2a32;margin:0;">${r.date || ""} ${r.week ? `· ${r.week}` : ""}</h2>
+      </div>
+      ${r.mood ? `<span style="display:inline-block;background:${accent}22;color:${accent};padding:4px 14px;border-radius:20px;font-size:13px;margin-bottom:8px;">${r.mood}</span>` : ""}
+      ${r.condition ? `<p style="color:#6a4a58;font-size:16px;margin:12px 0;"><strong>컨디션</strong> · ${r.condition}</p>` : ""}
+      ${r.hospital ? `<p style="color:#6a4a58;font-size:16px;margin:12px 0;"><strong>병원</strong> · ${r.hospital}</p>` : ""}
+      ${r.checkup ? `<p style="color:#6a4a58;font-size:16px;margin:12px 0;"><strong>검진 내용</strong> · ${r.checkup}</p>` : ""}
+      ${r.feeling ? `<div style="background:#fdf6f9;border-radius:12px;padding:20px;margin:16px 0;color:#5a3a48;font-size:16px;line-height:1.8;">${r.feeling}</div>` : ""}
+      ${r.message ? `<div style="background:#fdf6f9;border-radius:12px;padding:20px;margin:16px 0;border-left:4px solid ${accent};color:#5a3a48;font-size:16px;line-height:1.8;"><p style="font-size:12px;color:${accent};margin:0 0 8px;font-weight:600;">아기에게 한마디</p>${r.message}</div>` : ""}
+      ${r.memory ? `<div style="color:#8a6a78;font-size:15px;margin:16px 0;line-height:1.8;">${r.memory}</div>` : ""}
+      ${r.memo ? `<div style="color:#8a6a78;font-size:15px;margin:16px 0;line-height:1.8;">${r.memo}</div>` : ""}
+      <div style="position:absolute;bottom:40px;right:64px;font-size:13px;color:#ccc;">${i + 1} / ${records.length}</div>
+      <div style="position:absolute;bottom:40px;left:64px;font-size:13px;color:#ddd;">${babyName}의 태교북</div>
+    `;
+    document.body.appendChild(el);
+    const canvas = await html2canvas(el, { scale: 1.5, useCORS: true, backgroundColor: "#ffffff" });
+    document.body.removeChild(el);
+    pdf.addPage();
+    pdf.addImage(canvas.toDataURL("image/jpeg", 0.88), "JPEG", 0, 0, W, H);
+  }
+
+  pdf.save(`${babyName}_태교북.pdf`);
+}
+
+function Settings({ data, setData }) {
+  const [exporting, setExporting] = useState(false);
   const reset = () => { if (!confirm("저장된 태교북 기록을 모두 초기화할까요?")) return; localStorage.removeItem(STORAGE_KEY); setData(INITIAL); };
   const clearCaches = async () => { if ("serviceWorker" in navigator) { const regs = await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map((reg) => reg.unregister())); } if ("caches" in window) { const keys = await caches.keys(); await Promise.all(keys.map((key) => caches.delete(key))); } alert("브라우저 캐시와 서비스워커를 정리했습니다. 새로고침해주세요."); };
-  return <main className="screen"><section className="card pad"><h2 className="form-title">설정</h2><p className="muted-text">화면이 예전 그대로 보이면 캐시 정리를 먼저 해주세요.</p><button className="ghost full" onClick={clearCaches}>서비스워커/캐시 정리</button><button className="danger full" onClick={reset}>기록 전체 초기화</button></section></main>;
+  const handleExport = async () => {
+    const total = data.dailyRecords.length + data.activityRecords.length + data.hospitalRecords.length;
+    if (total === 0) { alert("저장된 기록이 없어요. 먼저 기록을 작성해보세요!"); return; }
+    setExporting(true);
+    try { await exportPDF(data); } catch (e) { alert("PDF 생성 중 오류가 발생했어요. 다시 시도해주세요."); console.error(e); }
+    finally { setExporting(false); }
+  };
+  return <main className="screen"><section className="card pad"><h2 className="form-title">설정</h2><div style={{marginBottom:"24px"}}><h3 style={{margin:"0 0 8px",fontSize:"16px",color:"var(--deep)"}}>📄 태교북 PDF 내보내기</h3><p className="muted-text" style={{marginBottom:"12px"}}>지금까지 기록한 모든 내용을 예쁜 PDF로 저장해요.</p><button className="primary full" onClick={handleExport} disabled={exporting}>{exporting ? "⏳ PDF 생성 중..." : "💗 PDF로 내보내기"}</button></div><hr style={{border:"none",borderTop:"1px solid #f0e0e8",margin:"16px 0"}}/><p className="muted-text">화면이 예전 그대로 보이면 캐시 정리를 먼저 해주세요.</p><button className="ghost full" onClick={clearCaches}>서비스워커/캐시 정리</button><button className="danger full" onClick={reset}>기록 전체 초기화</button></section></main>;
 }
 export default function App() {
   const [data, setData] = usePlanner();
@@ -735,5 +821,5 @@ export default function App() {
   };
   const mood = getMood(data.babyInfo.coverMood);
   const bgStyle = { "--app-a": mood.sky[0], "--app-b": mood.sky[1], "--app-c": `${mood.accent}33`, "--accent": mood.accent, "--deep": mood.deep };
-  return <div className="app-shell" style={bgStyle}><div className="ambient"/><BabyNamePopup data={data} setData={setData}/><div className="app"><Header data={data}/>{tab === "home" && <Home data={data} setData={setData} setTab={setTab} setWriteTab={setWriteTab}/>} {tab === "write" && <Write data={data} setData={setData} writeTab={writeTab} setWriteTab={setWriteTab} setTab={setTab}/>} {tab === "book" && <Book data={data} setData={setData}/>} {tab === "settings" && <Settings setData={setData}/>}<nav className="bottom"><button className={tab === "home" ? "on" : ""} onClick={() => setTab("home")}><span>🏠</span>홈</button><button className={tab === "write" ? "on" : ""} onClick={openWrite}><span>✍️</span>기록</button><button className={tab === "book" ? "on" : ""} onClick={() => setTab("book")}><span>📖</span>태교북</button><button className={tab === "settings" ? "on" : ""} onClick={() => setTab("settings")}><span>⚙️</span>설정</button></nav></div></div>;
+  return <div className="app-shell" style={bgStyle}><div className="ambient"/><BabyNamePopup data={data} setData={setData}/><div className="app"><Header data={data}/>{tab === "home" && <Home data={data} setData={setData} setTab={setTab} setWriteTab={setWriteTab}/>} {tab === "write" && <Write data={data} setData={setData} writeTab={writeTab} setWriteTab={setWriteTab} setTab={setTab}/>} {tab === "book" && <Book data={data} setData={setData}/>} {tab === "settings" && <Settings data={data} setData={setData}/>}<nav className="bottom"><button className={tab === "home" ? "on" : ""} onClick={() => setTab("home")}><span>🏠</span>홈</button><button className={tab === "write" ? "on" : ""} onClick={openWrite}><span>✍️</span>기록</button><button className={tab === "book" ? "on" : ""} onClick={() => setTab("book")}><span>📖</span>태교북</button><button className={tab === "settings" ? "on" : ""} onClick={() => setTab("settings")}><span>⚙️</span>설정</button></nav></div></div>;
 }
