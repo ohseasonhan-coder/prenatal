@@ -974,43 +974,73 @@ async function exportPDF(data) {
     } catch(e) { console.error(e); return null; }
   };
 
-  // 기록 카드 HTML 생성 헬퍼 (절반 높이용)
+  // A4 기준 상수 (794 x 1123px @96dpi)
+  const PAGE_W = 794, PAGE_H = 1123;
+  const PAD = 36;           // 페이지 여백
+  const GAP = 20;           // 카드 간격
+  const CARD_H = Math.floor((PAGE_H - PAD * 2 - GAP) / 2); // 카드 1개 높이 ≈ 515px
+  const IMG_H = Math.floor(CARD_H * 0.38); // 이미지 영역 높이 ≈ 196px (카드 38%)
+  const CARD_W = PAGE_W - PAD * 2;         // 카드 너비 ≈ 722px
+
+  // 기록 카드 HTML 생성 헬퍼
   const makeCardHtml = (r, sceneDataUrl, idx, total) => {
     const accent = MOOD_COLORS[r.mood] || "#f27ea5";
     const light = accent + "18";
+
+    // 이미지: 씬/사진 모두 동일한 틀(CARD_W x IMG_H)에 object-fit:cover로 맞춤
     const imgHtml = sceneDataUrl
-      ? `<div style="margin-bottom:10px;border-radius:12px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.08);width:100%;aspect-ratio:420/260;">
+      ? `<div style="width:${CARD_W - 32}px;height:${IMG_H}px;border-radius:10px;overflow:hidden;margin-bottom:10px;flex-shrink:0;">
            <img src="${sceneDataUrl}" style="width:100%;height:100%;object-fit:cover;display:block;" />
          </div>`
       : r.photo
-      ? `<div style="margin-bottom:10px;border-radius:12px;overflow:hidden;width:100%;aspect-ratio:420/260;">
+      ? `<div style="width:${CARD_W - 32}px;height:${IMG_H}px;border-radius:10px;overflow:hidden;margin-bottom:10px;flex-shrink:0;">
            <img src="${r.photo}" style="width:100%;height:100%;object-fit:cover;display:block;" crossorigin="anonymous"/>
          </div>`
       : "";
 
-    const field = (label, val, extra="") =>
-      val ? `<div style="margin-bottom:8px;">
-        <p style="font-size:10px;color:${accent};font-weight:700;margin:0 0 3px;">${label}</p>
-        <div style="font-size:12px;color:#5a3a48;background:${light};padding:8px 12px;border-radius:8px;line-height:1.7;${extra}">${val}</div>
+    const field = (label, val, extra = "") =>
+      val ? `<div style="margin-bottom:6px;">
+        <p style="font-size:9px;color:${accent};font-weight:700;margin:0 0 2px;letter-spacing:.04em;">${label}</p>
+        <div style="font-size:11px;color:#5a3a48;background:${light};padding:6px 10px;border-radius:7px;line-height:1.6;${extra}">${val}</div>
       </div>` : "";
 
     return `
-      <div style="padding:24px 28px;border-radius:16px;background:#fff;border:1px solid ${accent}22;box-shadow:0 4px 18px rgba(0,0,0,.06);height:100%;box-sizing:border-box;position:relative;overflow:hidden;">
-        <div style="position:absolute;top:0;left:0;right:0;height:4px;background:${accent};border-radius:16px 16px 0 0;"></div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;margin-top:2px;">
-          <span style="font-size:10px;color:${accent};font-weight:700;">${TYPE_EMOJIS[r.type]} ${TYPE_LABELS[r.type]}</span>
-          ${r.mood ? `<span style="font-size:10px;background:${light};color:${accent};padding:2px 10px;border-radius:999px;border:1px solid ${accent}44;">${r.mood}</span>` : ""}
+      <div style="
+        width:${CARD_W}px; height:${CARD_H}px;
+        background:#fff; border-radius:14px;
+        border:1px solid ${accent}28;
+        box-shadow:0 3px 14px rgba(0,0,0,.06);
+        overflow:hidden; position:relative;
+        display:flex; flex-direction:column;
+        box-sizing:border-box;
+      ">
+        <!-- 상단 컬러 바 -->
+        <div style="height:4px;background:${accent};flex-shrink:0;"></div>
+
+        <!-- 카드 내용 -->
+        <div style="padding:14px 16px;flex:1;overflow:hidden;display:flex;flex-direction:column;">
+          <!-- 헤더 -->
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-shrink:0;">
+            <span style="font-size:9px;color:${accent};font-weight:800;">${TYPE_EMOJIS[r.type]} ${TYPE_LABELS[r.type]}</span>
+            ${r.mood ? `<span style="font-size:9px;background:${light};color:${accent};padding:2px 8px;border-radius:999px;border:1px solid ${accent}44;">${r.mood}</span>` : ""}
+            <span style="font-size:9px;color:#aaa;margin-left:auto;">${idx} / ${total}</span>
+          </div>
+          <h3 style="font-size:16px;color:#3a2a32;margin:0 0 10px;font-weight:700;flex-shrink:0;">${r.date || "날짜 없음"}${r.week ? `&nbsp;·&nbsp;${r.week}` : ""}</h3>
+
+          <!-- 이미지 (씬 또는 사진, 동일 틀) -->
+          ${imgHtml}
+
+          <!-- 텍스트 내용 -->
+          <div style="flex:1;overflow:hidden;">
+            ${field("컨디션", r.condition)}
+            ${field("병원", r.hospital)}
+            ${field("검진 내용", r.checkup)}
+            ${field("오늘의 느낌", r.feeling)}
+            ${field("아기에게 한마디", r.message, `border-left:3px solid ${accent};`)}
+            ${field("오늘의 기억", r.memory)}
+            ${field("메모", r.memo)}
+          </div>
         </div>
-        <h3 style="font-size:18px;color:#3a2a32;margin:0 0 10px;font-weight:700;">${r.date || "날짜 없음"}${r.week ? `&nbsp;·&nbsp;${r.week}` : ""}</h3>
-        ${imgHtml}
-        ${field("컨디션", r.condition)}
-        ${field("병원", r.hospital)}
-        ${field("검진 내용", r.checkup)}
-        ${field("오늘의 느낌", r.feeling)}
-        ${field("아기에게 한마디", r.message, `border-left:3px solid ${accent};`)}
-        ${field("오늘의 기억", r.memory)}
-        ${field("메모", r.memo)}
-        <p style="position:absolute;bottom:10px;right:16px;font-size:9px;color:#ddd;margin:0;">${idx} / ${total}</p>
       </div>`;
   };
 
@@ -1025,16 +1055,18 @@ async function exportPDF(data) {
     ]);
 
     const el = document.createElement("div");
-    el.style.cssText = `width:794px;height:1123px;${baseStyle}
-      background:#fdf8fb;padding:40px;box-sizing:border-box;
-      display:grid;grid-template-rows:${r2 ? "1fr 1fr" : "1fr"};gap:24px;position:relative;`;
+    el.style.cssText = `
+      width:${PAGE_W}px; height:${PAGE_H}px;
+      ${baseStyle}
+      background:#faf6f9;
+      padding:${PAD}px;
+      box-sizing:border-box;
+      display:flex; flex-direction:column; gap:${GAP}px;
+    `;
     el.innerHTML = `
-      <div style="height:100%;">${makeCardHtml(r1, s1, i + 1, records.length)}</div>
-      ${r2 ? `<div style="height:100%;">${makeCardHtml(r2, s2, i + 2, records.length)}</div>` : ""}
-      <div style="position:absolute;bottom:14px;left:40px;right:40px;display:flex;justify-content:space-between;">
-        <span style="font-size:9px;color:#ccc;">${babyName}의 태교북</span>
-        <span style="font-size:9px;color:#ccc;">Prenatal Story Book</span>
-      </div>
+      ${makeCardHtml(r1, s1, i + 1, records.length)}
+      ${r2 ? makeCardHtml(r2, s2, i + 2, records.length) : `<div style="height:${CARD_H}px;"></div>`}
+      <div style="text-align:center;font-size:9px;color:#ddd;margin-top:auto;">${babyName}의 태교북 · Prenatal Story Book</div>
     `;
 
     const canvas = await capture(el);
