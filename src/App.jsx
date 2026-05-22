@@ -974,80 +974,66 @@ async function exportPDF(data) {
     } catch(e) { console.error(e); return null; }
   };
 
-  for (let i = 0; i < records.length; i++) {
-    const r = records[i];
+  // 기록 카드 HTML 생성 헬퍼 (절반 높이용)
+  const makeCardHtml = (r, sceneDataUrl, idx, total) => {
     const accent = MOOD_COLORS[r.mood] || "#f27ea5";
     const light = accent + "18";
+    const imgHtml = sceneDataUrl
+      ? `<div style="margin-bottom:10px;border-radius:12px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.08);width:100%;aspect-ratio:420/260;">
+           <img src="${sceneDataUrl}" style="width:100%;height:100%;object-fit:cover;display:block;" />
+         </div>`
+      : r.photo
+      ? `<div style="margin-bottom:10px;border-radius:12px;overflow:hidden;width:100%;aspect-ratio:420/260;">
+           <img src="${r.photo}" style="width:100%;height:100%;object-fit:cover;display:block;" crossorigin="anonymous"/>
+         </div>`
+      : "";
 
-    // 씬 이미지 캡처 (태교북 화면에 렌더된 씬)
-    const sceneDataUrl = await svgToDataUrl(r.id);
+    const field = (label, val, extra="") =>
+      val ? `<div style="margin-bottom:8px;">
+        <p style="font-size:10px;color:${accent};font-weight:700;margin:0 0 3px;">${label}</p>
+        <div style="font-size:12px;color:#5a3a48;background:${light};padding:8px 12px;border-radius:8px;line-height:1.7;${extra}">${val}</div>
+      </div>` : "";
+
+    return `
+      <div style="padding:24px 28px;border-radius:16px;background:#fff;border:1px solid ${accent}22;box-shadow:0 4px 18px rgba(0,0,0,.06);height:100%;box-sizing:border-box;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:0;left:0;right:0;height:4px;background:${accent};border-radius:16px 16px 0 0;"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;margin-top:2px;">
+          <span style="font-size:10px;color:${accent};font-weight:700;">${TYPE_EMOJIS[r.type]} ${TYPE_LABELS[r.type]}</span>
+          ${r.mood ? `<span style="font-size:10px;background:${light};color:${accent};padding:2px 10px;border-radius:999px;border:1px solid ${accent}44;">${r.mood}</span>` : ""}
+        </div>
+        <h3 style="font-size:18px;color:#3a2a32;margin:0 0 10px;font-weight:700;">${r.date || "날짜 없음"}${r.week ? `&nbsp;·&nbsp;${r.week}` : ""}</h3>
+        ${imgHtml}
+        ${field("컨디션", r.condition)}
+        ${field("병원", r.hospital)}
+        ${field("검진 내용", r.checkup)}
+        ${field("오늘의 느낌", r.feeling)}
+        ${field("아기에게 한마디", r.message, `border-left:3px solid ${accent};`)}
+        ${field("오늘의 기억", r.memory)}
+        ${field("메모", r.memo)}
+        <p style="position:absolute;bottom:10px;right:16px;font-size:9px;color:#ddd;margin:0;">${idx} / ${total}</p>
+      </div>`;
+  };
+
+  // 2개씩 묶어서 페이지 구성
+  for (let i = 0; i < records.length; i += 2) {
+    const r1 = records[i];
+    const r2 = records[i + 1] || null;
+
+    const [s1, s2] = await Promise.all([
+      svgToDataUrl(r1.id),
+      r2 ? svgToDataUrl(r2.id) : Promise.resolve(null),
+    ]);
 
     const el = document.createElement("div");
     el.style.cssText = `width:794px;height:1123px;${baseStyle}
-      background:#ffffff;padding:64px;position:relative;overflow:hidden;`;
+      background:#fdf8fb;padding:40px;box-sizing:border-box;
+      display:grid;grid-template-rows:${r2 ? "1fr 1fr" : "1fr"};gap:24px;position:relative;`;
     el.innerHTML = `
-      <div style="position:absolute;top:0;left:0;right:0;height:6px;background:${accent};"></div>
-
-      <div style="border-left:5px solid ${accent};padding-left:18px;margin-bottom:20px;margin-top:10px;">
-        <p style="font-size:12px;color:${accent};margin:0 0 6px;font-weight:700;">${TYPE_EMOJIS[r.type]} ${TYPE_LABELS[r.type]}</p>
-        <h2 style="font-size:28px;color:#3a2a32;margin:0;font-weight:700;">${r.date || "날짜 없음"}${r.week ? `&nbsp;&nbsp;·&nbsp;&nbsp;${r.week}` : ""}</h2>
-      </div>
-
-      ${r.mood ? `<span style="display:inline-block;background:${light};color:${accent};padding:4px 14px;border-radius:24px;font-size:12px;font-weight:700;margin-bottom:16px;border:1px solid ${accent}44;">${r.mood}</span>` : ""}
-
-      ${sceneDataUrl ? `
-        <div style="margin-bottom:20px;border-radius:18px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.08);">
-          <img src="${sceneDataUrl}" style="width:100%;display:block;" />
-        </div>` : r.photo ? `
-        <div style="margin-bottom:20px;border-radius:18px;overflow:hidden;">
-          <img src="${r.photo}" style="width:100%;display:block;" crossorigin="anonymous"/>
-        </div>` : ""}
-
-      ${r.condition ? `
-        <div style="margin-bottom:14px;">
-          <p style="font-size:11px;color:${accent};font-weight:700;margin:0 0 4px;">컨디션</p>
-          <p style="font-size:14px;color:#5a3a48;margin:0;background:${light};padding:10px 14px;border-radius:10px;">${r.condition}</p>
-        </div>` : ""}
-
-      ${r.hospital ? `
-        <div style="margin-bottom:14px;">
-          <p style="font-size:11px;color:${accent};font-weight:700;margin:0 0 4px;">병원</p>
-          <p style="font-size:14px;color:#5a3a48;margin:0;background:${light};padding:10px 14px;border-radius:10px;">${r.hospital}</p>
-        </div>` : ""}
-
-      ${r.checkup ? `
-        <div style="margin-bottom:14px;">
-          <p style="font-size:11px;color:${accent};font-weight:700;margin:0 0 4px;">검진 내용</p>
-          <p style="font-size:14px;color:#5a3a48;margin:0;background:${light};padding:10px 14px;border-radius:10px;">${r.checkup}</p>
-        </div>` : ""}
-
-      ${r.feeling ? `
-        <div style="margin-bottom:14px;">
-          <p style="font-size:11px;color:${accent};font-weight:700;margin:0 0 4px;">오늘의 느낌</p>
-          <div style="font-size:14px;color:#5a3a48;background:${light};padding:12px 16px;border-radius:10px;line-height:1.8;">${r.feeling}</div>
-        </div>` : ""}
-
-      ${r.message ? `
-        <div style="margin-bottom:14px;">
-          <p style="font-size:11px;color:${accent};font-weight:700;margin:0 0 4px;">아기에게 한마디</p>
-          <div style="font-size:14px;color:#5a3a48;background:${light};padding:12px 16px;border-radius:10px;border-left:4px solid ${accent};line-height:1.8;">${r.message}</div>
-        </div>` : ""}
-
-      ${r.memory ? `
-        <div style="margin-bottom:14px;">
-          <p style="font-size:11px;color:${accent};font-weight:700;margin:0 0 4px;">오늘의 기억</p>
-          <div style="font-size:14px;color:#5a3a48;background:${light};padding:12px 16px;border-radius:10px;line-height:1.8;">${r.memory}</div>
-        </div>` : ""}
-
-      ${r.memo ? `
-        <div style="margin-bottom:14px;">
-          <p style="font-size:11px;color:${accent};font-weight:700;margin:0 0 4px;">메모</p>
-          <div style="font-size:14px;color:#5a3a48;background:${light};padding:12px 16px;border-radius:10px;line-height:1.8;">${r.memo}</div>
-        </div>` : ""}
-
-      <div style="position:absolute;bottom:36px;left:64px;right:64px;display:flex;justify-content:space-between;border-top:1px solid #f0e0e8;padding-top:12px;">
-        <span style="font-size:11px;color:#ccc;">${babyName}의 태교북</span>
-        <span style="font-size:11px;color:#ccc;">${i + 1} / ${records.length}</span>
+      <div style="height:100%;">${makeCardHtml(r1, s1, i + 1, records.length)}</div>
+      ${r2 ? `<div style="height:100%;">${makeCardHtml(r2, s2, i + 2, records.length)}</div>` : ""}
+      <div style="position:absolute;bottom:14px;left:40px;right:40px;display:flex;justify-content:space-between;">
+        <span style="font-size:9px;color:#ccc;">${babyName}의 태교북</span>
+        <span style="font-size:9px;color:#ccc;">Prenatal Story Book</span>
       </div>
     `;
 
