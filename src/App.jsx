@@ -848,6 +848,7 @@ async function exportPDF(data) {
     const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej;
     document.head.appendChild(s);
   });
+  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
   await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
   const { jsPDF } = window.jspdf;
 
@@ -860,154 +861,137 @@ async function exportPDF(data) {
   ].sort((a, c) => new Date(a.date) - new Date(c.date));
 
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const W = 210, H = 297, M = 20;
+  const W = 210, H = 297;
+
+  // 캡처용 컨테이너 — 화면 위에 고정, 스크롤 밖으로 숨김
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "position:fixed;top:-9999px;left:0;width:794px;z-index:-1;";
+  document.body.appendChild(wrap);
+
+  const capture = async (el) => {
+    wrap.innerHTML = "";
+    wrap.appendChild(el);
+    // 폰트 로드 대기
+    await document.fonts.ready;
+    // 약간 대기 후 캡처 (이미지 로드 포함)
+    await new Promise(r => setTimeout(r, 120));
+    wrap.style.top = "0px"; // 잠깐 보이게
+    const canvas = await window.html2canvas(el, {
+      scale: 2, useCORS: true, allowTaint: true,
+      backgroundColor: "#ffffff", logging: false,
+      width: 794, windowWidth: 794,
+    });
+    wrap.style.top = "-9999px";
+    return canvas;
+  };
 
   const MOOD_COLORS = {
-    "사랑":[242,126,165],"설렘":[244,162,97],"차분함":[155,142,196],
-    "편안함":[106,184,200],"기쁨":[247,210,110],"평온":[125,186,142],
+    "사랑":"#f27ea5","설렘":"#f4a261","차분함":"#9b8ec4",
+    "편안함":"#6ab8c8","기쁨":"#f7d26e","평온":"#7dba8e",
   };
   const TYPE_LABELS = { daily:"임신 주차 기록", activity:"태교 활동", hospital:"병원 기록" };
-  const TYPE_EMOJIS_TEXT = { daily:"[주차]", activity:"[활동]", hospital:"[병원]" };
+  const TYPE_EMOJIS = { daily:"📝", activity:"🌿", hospital:"🏥" };
 
-  // 텍스트 줄바꿈 헬퍼
-  const wrapText = (pdf, text, x, maxW, fontSize) => {
-    pdf.setFontSize(fontSize);
-    return pdf.splitTextToSize(String(text || ""), maxW);
-  };
+  const baseStyle = `
+    font-family:'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    box-sizing:border-box; line-height:1.7; color:#3f3138;
+  `;
 
-  // ── 커버 페이지 ──
-  // 배경 그라디언트 효과 (핑크 계열)
-  pdf.setFillColor(253, 232, 240);
-  pdf.rect(0, 0, W, H, "F");
-  pdf.setFillColor(255, 245, 249);
-  pdf.rect(0, H * 0.4, W, H * 0.6, "F");
+  // ── 커버 ──
+  const coverEl = document.createElement("div");
+  coverEl.style.cssText = `width:794px;height:1123px;${baseStyle}
+    background:linear-gradient(160deg,#fde8f0 0%,#fff5f9 50%,#fde8f0 100%);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px;`;
+  coverEl.innerHTML = `
+    <div style="font-size:64px;margin-bottom:28px;">💗</div>
+    <h1 style="font-size:44px;color:#c0567a;margin:0 0 14px;font-weight:700;text-align:center;">${babyName}를 기다리며</h1>
+    <p style="font-size:20px;color:#e08ca8;margin:0 0 40px;">태교 일기</p>
+    <div style="width:80px;height:2px;background:#f2a0c0;margin-bottom:40px;border-radius:2px;"></div>
+    ${b.dueDate ? `<p style="font-size:15px;color:#c0829a;margin:6px 0;">출산 예정일 · ${b.dueDate}</p>` : ""}
+    ${b.motherName ? `<p style="font-size:15px;color:#c0829a;margin:6px 0;">작성자 · ${b.motherName}</p>` : ""}
+    <div style="margin-top:60px;display:flex;gap:24px;">
+      <span style="background:#fff0f5;color:#c0567a;padding:10px 20px;border-radius:24px;font-size:13px;font-weight:700;">📝 주차기록 ${data.dailyRecords.length}개</span>
+      <span style="background:#fff0f5;color:#c0567a;padding:10px 20px;border-radius:24px;font-size:13px;font-weight:700;">🌿 활동기록 ${data.activityRecords.length}개</span>
+      <span style="background:#fff0f5;color:#c0567a;padding:10px 20px;border-radius:24px;font-size:13px;font-weight:700;">🏥 병원기록 ${data.hospitalRecords.length}개</span>
+    </div>
+    <p style="position:absolute;bottom:40px;font-size:11px;color:#ddd;letter-spacing:.1em;">Prenatal Story Book</p>
+  `;
+  const coverCanvas = await capture(coverEl);
+  pdf.addImage(coverCanvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, W, H);
 
-  // 장식 원
-  pdf.setFillColor(242, 126, 165);
-  pdf.setGState(new pdf.GState({ opacity: 0.08 }));
-  pdf.circle(W * 0.15, H * 0.1, 60, "F");
-  pdf.circle(W * 0.85, H * 0.85, 80, "F");
-  pdf.setGState(new pdf.GState({ opacity: 1 }));
-
-  // 제목
-  pdf.setTextColor(192, 86, 122);
-  pdf.setFontSize(32); pdf.setFont("helvetica", "bold");
-  pdf.text(`${babyName}${babyName.match(/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/) ? "를" : "의"} 기다리며`, W/2, H*0.38, { align:"center" });
-  pdf.setFontSize(16); pdf.setFont("helvetica", "normal");
-  pdf.setTextColor(224, 140, 168);
-  pdf.text("태교 일기", W/2, H*0.38+12, { align:"center" });
-
-  // 구분선
-  pdf.setDrawColor(242, 126, 165); pdf.setLineWidth(0.5);
-  pdf.line(M+20, H*0.38+18, W-M-20, H*0.38+18);
-
-  // 정보
-  pdf.setFontSize(12); pdf.setTextColor(180, 130, 155);
-  let infoY = H*0.38+30;
-  if (b.dueDate) { pdf.text(`출산 예정일  ${b.dueDate}`, W/2, infoY, { align:"center" }); infoY += 9; }
-  if (b.motherName) { pdf.text(`작성자  ${b.motherName}`, W/2, infoY, { align:"center" }); infoY += 9; }
-
-  // 통계
-  pdf.setFontSize(11); pdf.setTextColor(192, 86, 122);
-  const statsY = H*0.75;
-  [[`주차기록 ${data.dailyRecords.length}개`, W/2-45], [`활동기록 ${data.activityRecords.length}개`, W/2], [`병원기록 ${data.hospitalRecords.length}개`, W/2+45]].forEach(([t, x]) => {
-    pdf.setFillColor(255, 220, 235); pdf.roundedRect(x-22, statsY-6, 44, 12, 4, 4, "F");
-    pdf.setTextColor(192, 86, 122); pdf.text(t, x, statsY+2, { align:"center" });
-  });
-
-  // 하단
-  pdf.setFontSize(9); pdf.setTextColor(210, 180, 195);
-  pdf.text("Prenatal Story Book", W/2, H-12, { align:"center" });
-
-  // ── 기록 페이지들 ──
+  // ── 기록 페이지 ──
   for (let i = 0; i < records.length; i++) {
-    pdf.addPage();
     const r = records[i];
-    const ac = MOOD_COLORS[r.mood] || [242, 126, 165];
+    const accent = MOOD_COLORS[r.mood] || "#f27ea5";
+    const light = accent + "18";
 
-    // 배경
-    pdf.setFillColor(255, 255, 255); pdf.rect(0, 0, W, H, "F");
-    pdf.setFillColor(ac[0], ac[1], ac[2]);
-    pdf.setGState(new pdf.GState({ opacity: 0.06 }));
-    pdf.rect(0, 0, W, H, "F");
-    pdf.setGState(new pdf.GState({ opacity: 1 }));
+    const el = document.createElement("div");
+    el.style.cssText = `width:794px;min-height:1123px;${baseStyle}
+      background:#ffffff;padding:64px;position:relative;`;
+    el.innerHTML = `
+      <div style="position:absolute;top:0;left:0;right:0;height:6px;background:${accent};border-radius:0;"></div>
 
-    // 상단 컬러 바
-    pdf.setFillColor(ac[0], ac[1], ac[2]);
-    pdf.rect(0, 0, W, 2, "F");
+      <div style="border-left:5px solid ${accent};padding-left:18px;margin-bottom:28px;margin-top:10px;">
+        <p style="font-size:12px;color:${accent};margin:0 0 6px;font-weight:700;">${TYPE_EMOJIS[r.type]} ${TYPE_LABELS[r.type]}</p>
+        <h2 style="font-size:30px;color:#3a2a32;margin:0;font-weight:700;">${r.date || "날짜 없음"}${r.week ? `&nbsp;&nbsp;·&nbsp;&nbsp;${r.week}` : ""}</h2>
+      </div>
 
-    // 타입 + 날짜
-    let y = M + 10;
-    pdf.setFillColor(ac[0], ac[1], ac[2]);
-    pdf.setGState(new pdf.GState({ opacity: 0.15 }));
-    pdf.roundedRect(M, y-5, 50, 10, 3, 3, "F");
-    pdf.setGState(new pdf.GState({ opacity: 1 }));
-    pdf.setFontSize(10); pdf.setFont("helvetica", "bold"); pdf.setTextColor(ac[0], ac[1], ac[2]);
-    pdf.text(TYPE_EMOJIS_TEXT[r.type] + " " + TYPE_LABELS[r.type], M+3, y+2);
+      ${r.mood ? `<span style="display:inline-block;background:${light};color:${accent};padding:5px 16px;border-radius:24px;font-size:13px;font-weight:700;margin-bottom:20px;border:1px solid ${accent}44;">${r.mood}</span>` : ""}
 
-    // 날짜 + 주차
-    y += 14;
-    pdf.setFontSize(22); pdf.setFont("helvetica", "bold"); pdf.setTextColor(58, 42, 50);
-    pdf.text(`${r.date || "날짜 없음"}${r.week ? "  ·  " + r.week : ""}`, M, y);
+      ${r.condition ? `
+        <div style="margin-bottom:16px;">
+          <p style="font-size:11px;color:${accent};font-weight:700;margin:0 0 5px;">컨디션</p>
+          <p style="font-size:15px;color:#5a3a48;margin:0;background:${light};padding:12px 16px;border-radius:12px;">${r.condition}</p>
+        </div>` : ""}
 
-    // 구분선
-    y += 6;
-    pdf.setDrawColor(ac[0], ac[1], ac[2]); pdf.setLineWidth(0.8);
-    pdf.line(M, y, W-M, y);
-    y += 10;
+      ${r.hospital ? `
+        <div style="margin-bottom:16px;">
+          <p style="font-size:11px;color:${accent};font-weight:700;margin:0 0 5px;">병원</p>
+          <p style="font-size:15px;color:#5a3a48;margin:0;background:${light};padding:12px 16px;border-radius:12px;">${r.hospital}</p>
+        </div>` : ""}
 
-    // 무드 태그
-    if (r.mood) {
-      pdf.setFillColor(ac[0], ac[1], ac[2]);
-      pdf.setGState(new pdf.GState({ opacity: 0.15 }));
-      pdf.roundedRect(M, y-5, 30, 10, 5, 5, "F");
-      pdf.setGState(new pdf.GState({ opacity: 1 }));
-      pdf.setFontSize(11); pdf.setFont("helvetica", "normal"); pdf.setTextColor(ac[0], ac[1], ac[2]);
-      pdf.text(r.mood, M+4, y+2);
-      y += 14;
-    }
+      ${r.checkup ? `
+        <div style="margin-bottom:16px;">
+          <p style="font-size:11px;color:${accent};font-weight:700;margin:0 0 5px;">검진 내용</p>
+          <p style="font-size:15px;color:#5a3a48;margin:0;background:${light};padding:12px 16px;border-radius:12px;">${r.checkup}</p>
+        </div>` : ""}
 
-    // 내용 필드 렌더 헬퍼
-    const addField = (label, value) => {
-      if (!value) return;
-      if (y > H - 30) return; // 페이지 넘침 방지
-      pdf.setFontSize(9); pdf.setFont("helvetica", "bold"); pdf.setTextColor(ac[0], ac[1], ac[2]);
-      pdf.text(label, M, y); y += 6;
-      pdf.setFont("helvetica", "normal"); pdf.setTextColor(80, 55, 65);
-      pdf.setFontSize(12);
-      const lines = wrapText(pdf, value, M, W - M*2, 12);
-      // 배경 박스
-      const boxH = lines.length * 7 + 10;
-      pdf.setFillColor(253, 246, 249);
-      pdf.setGState(new pdf.GState({ opacity: 0.8 }));
-      pdf.roundedRect(M, y-4, W-M*2, boxH, 4, 4, "F");
-      pdf.setGState(new pdf.GState({ opacity: 1 }));
-      // 왼쪽 강조선 (메시지만)
-      if (label === "아기에게 한마디") {
-        pdf.setFillColor(ac[0], ac[1], ac[2]);
-        pdf.rect(M, y-4, 2, boxH, "F");
-      }
-      pdf.setTextColor(80, 55, 65);
-      lines.forEach(line => { pdf.text(line, M+5, y+3); y += 7; });
-      y += 8;
-    };
+      ${r.feeling ? `
+        <div style="margin-bottom:16px;">
+          <p style="font-size:11px;color:${accent};font-weight:700;margin:0 0 5px;">오늘의 느낌</p>
+          <div style="font-size:15px;color:#5a3a48;background:${light};padding:16px 18px;border-radius:12px;line-height:1.8;">${r.feeling}</div>
+        </div>` : ""}
 
-    addField("컨디션", r.condition);
-    addField("병원", r.hospital);
-    addField("검진 내용", r.checkup);
-    addField("오늘의 느낌", r.feeling);
-    addField("아기에게 한마디", r.message);
-    addField("오늘의 기억", r.memory);
-    addField("메모", r.memo);
+      ${r.message ? `
+        <div style="margin-bottom:16px;">
+          <p style="font-size:11px;color:${accent};font-weight:700;margin:0 0 5px;">아기에게 한마디</p>
+          <div style="font-size:15px;color:#5a3a48;background:${light};padding:16px 18px;border-radius:12px;border-left:4px solid ${accent};line-height:1.8;">${r.message}</div>
+        </div>` : ""}
 
-    // 하단 페이지 번호
-    pdf.setFontSize(9); pdf.setFont("helvetica", "normal"); pdf.setTextColor(200, 180, 190);
-    pdf.text(`${babyName}의 태교북`, M, H-8);
-    pdf.text(`${i + 1} / ${records.length}`, W-M, H-8, { align:"right" });
-    pdf.setDrawColor(230, 210, 220); pdf.setLineWidth(0.3);
-    pdf.line(M, H-12, W-M, H-12);
+      ${r.memory ? `
+        <div style="margin-bottom:16px;">
+          <p style="font-size:11px;color:${accent};font-weight:700;margin:0 0 5px;">오늘의 기억</p>
+          <div style="font-size:15px;color:#5a3a48;background:${light};padding:16px 18px;border-radius:12px;line-height:1.8;">${r.memory}</div>
+        </div>` : ""}
+
+      ${r.memo ? `
+        <div style="margin-bottom:16px;">
+          <p style="font-size:11px;color:${accent};font-weight:700;margin:0 0 5px;">메모</p>
+          <div style="font-size:15px;color:#5a3a48;background:${light};padding:16px 18px;border-radius:12px;line-height:1.8;">${r.memo}</div>
+        </div>` : ""}
+
+      <div style="position:absolute;bottom:36px;left:64px;right:64px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f0e0e8;padding-top:12px;">
+        <span style="font-size:11px;color:#ccc;">${babyName}의 태교북</span>
+        <span style="font-size:11px;color:#ccc;">${i + 1} / ${records.length}</span>
+      </div>
+    `;
+
+    const canvas = await capture(el);
+    pdf.addPage();
+    pdf.addImage(canvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, W, H);
   }
 
+  document.body.removeChild(wrap);
   pdf.save(`${babyName}_태교북.pdf`);
 }
 
