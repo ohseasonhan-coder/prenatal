@@ -863,25 +863,27 @@ async function exportPDF(data) {
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const W = 210, H = 297;
 
-  // 캡처용 컨테이너 — 화면 위에 고정, 스크롤 밖으로 숨김
+  // 캡처용 컨테이너
   const wrap = document.createElement("div");
-  wrap.style.cssText = "position:fixed;top:-9999px;left:0;width:794px;z-index:-1;";
+  wrap.style.cssText = "position:fixed;top:0;left:0;width:794px;overflow:visible;pointer-events:none;opacity:0;";
   document.body.appendChild(wrap);
 
   const capture = async (el) => {
     wrap.innerHTML = "";
+    wrap.style.height = el.style.minHeight || el.style.height || "1123px";
     wrap.appendChild(el);
-    // 폰트 로드 대기
     await document.fonts.ready;
-    // 약간 대기 후 캡처 (이미지 로드 포함)
-    await new Promise(r => setTimeout(r, 120));
-    wrap.style.top = "0px"; // 잠깐 보이게
+    await new Promise(r => setTimeout(r, 200));
+    // 캡처 직전 잠깐 보이게 (브라우저 렌더링 강제)
+    wrap.style.opacity = "1";
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
     const canvas = await window.html2canvas(el, {
       scale: 2, useCORS: true, allowTaint: true,
       backgroundColor: "#ffffff", logging: false,
-      width: 794, windowWidth: 794,
+      width: 794, height: parseInt(el.style.minHeight || el.style.height || "1123"),
+      windowWidth: 794,
     });
-    wrap.style.top = "-9999px";
+    wrap.style.opacity = "0";
     return canvas;
   };
 
@@ -901,7 +903,7 @@ async function exportPDF(data) {
   const coverEl = document.createElement("div");
   coverEl.style.cssText = `width:794px;height:1123px;${baseStyle}
     background:linear-gradient(160deg,#fde8f0 0%,#fff5f9 50%,#fde8f0 100%);
-    display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px;`;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px;position:relative;`;
   coverEl.innerHTML = `
     <div style="font-size:64px;margin-bottom:28px;">💗</div>
     <h1 style="font-size:44px;color:#c0567a;margin:0 0 14px;font-weight:700;text-align:center;">${babyName}를 기다리며</h1>
@@ -926,8 +928,8 @@ async function exportPDF(data) {
     const light = accent + "18";
 
     const el = document.createElement("div");
-    el.style.cssText = `width:794px;min-height:1123px;${baseStyle}
-      background:#ffffff;padding:64px;position:relative;`;
+    el.style.cssText = `width:794px;height:1123px;${baseStyle}
+      background:#ffffff;padding:64px;position:relative;overflow:hidden;`;
     el.innerHTML = `
       <div style="position:absolute;top:0;left:0;right:0;height:6px;background:${accent};border-radius:0;"></div>
 
