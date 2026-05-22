@@ -325,26 +325,24 @@ function ActivityLayer({ activity, mood, character = "family" }) {
   // 말풍선 중심은 엄마 머리 바로 위 (머리 y에서 rh+10 위로)
   // 캐릭터별 말풍선 위치 — 엄마 머리 바로 위 대각선 (mama_papa 기준)
   // SVG viewBox 420x260, translate(0 60) 적용
-  // 엄마 x 좌표 기준으로 말풍선을 왼쪽 or 오른쪽 위에 배치
-  // tailDx: 꼬리가 향하는 x방향 (양수=오른쪽, 음수=왼쪽)
   const BUBBLE_POS = {
-    // 엄마 중앙(210): 왼쪽 위에 배치, 꼬리 오른쪽 아래
-    mama:         { bx: 95,  by: 48, tailDx:  14, tailDy: 0 },
-    // 엄마 오른쪽(246): 왼쪽 위에 배치, 꼬리 오른쪽 아래 ← mama_papa 기준
-    mama_papa:    { bx: 110, by: 48, tailDx:  14, tailDy: 0 },
-    // 엄마 중앙(200): 왼쪽 위에 배치
-    mama_pet:     { bx: 90,  by: 48, tailDx:  14, tailDy: 0 },
-    mama_cat:     { bx: 90,  by: 48, tailDx:  14, tailDy: 0 },
-    // 오른쪽 엄마(248): 왼쪽 위에 배치
-    mama_friend:  { bx: 110, by: 48, tailDx:  14, tailDy: 0 },
-    mama_grandma: { bx: 110, by: 48, tailDx:  14, tailDy: 0 },
-    // 엄마 오른쪽(255): 왼쪽 위에 배치
-    couple_baby:  { bx: 110, by: 48, tailDx:  14, tailDy: 0 },
-    // 엄마 오른쪽(251): 왼쪽 위에 배치
-    family:       { bx: 110, by: 48, tailDx:  14, tailDy: 0 },
+    // 엄마 중앙(210): 왼쪽 위
+    mama:         { bx: 95,  by: 48, tailRight: false },
+    // 엄마 오른쪽(246): 왼쪽 위 ← mama_papa 기준
+    mama_papa:    { bx: 110, by: 48, tailRight: false },
+    // 엄마 중앙(200): 왼쪽 위
+    mama_pet:     { bx: 90,  by: 48, tailRight: false },
+    mama_cat:     { bx: 90,  by: 48, tailRight: false },
+    // 오른쪽 엄마(248): 왼쪽 위
+    mama_friend:  { bx: 110, by: 48, tailRight: false },
+    mama_grandma: { bx: 110, by: 48, tailRight: false },
+    // 엄마 오른쪽(255): 오른쪽 위, 꼬리 왼쪽 아래
+    couple_baby:  { bx: 320, by: 48, tailRight: true  },
+    // 엄마 오른쪽 중앙(251): 오른쪽 위, 꼬리 왼쪽 아래
+    family:       { bx: 320, by: 48, tailRight: true  },
   };
-  const pos = BUBBLE_POS[character] || { bx: 110, by: 48, tailDx: 14, tailDy: 0 };
-  const { bx, by, tailDx } = pos;
+  const pos = BUBBLE_POS[character] || { bx: 110, by: 48, tailRight: false };
+  const { bx, by, tailRight } = pos;
   const tailLeft = false; // 꼬리는 항상 아래쪽 (엄마 머리 위에 뜨므로)
 
   const rw = 52;
@@ -364,8 +362,15 @@ function ActivityLayer({ activity, mood, character = "family" }) {
   const drawX  = imgX + (imgW - crop.w * scale) / 2 - crop.x * scale;
   const drawY  = imgY + (imgH - crop.h * scale) / 2 - crop.y * scale;
 
-  // 꼬리: 짧고 부드럽게, 말풍선 오른쪽 하단에서 엄마 머리 방향으로
-  const tail = {
+  // 꼬리: tailRight=true면 말풍선 왼쪽 하단, false면 오른쪽 하단
+  const tail = tailRight ? {
+    p1: `${bx - rw + 14},${by + rh - 4}`,
+    p2: `${bx - rw - 14},${by + rh + 18}`,
+    p3: `${bx - rw + 2},${by + rh - 8}`,
+    d1: `${bx - rw + 12},${by + rh - 3}`,
+    d2: `${bx - rw - 10},${by + rh + 12}`,
+    d3: `${bx - rw + 1},${by + rh - 7}`,
+  } : {
     p1: `${bx + rw - 14},${by + rh - 4}`,
     p2: `${bx + rw + 14},${by + rh + 18}`,
     p3: `${bx + rw + 2},${by + rh - 8}`,
