@@ -277,19 +277,37 @@ function usePhotoUpload(onPhoto, onError) {
 // ── 토스트 ────────────────────────────────────────────
 function useToast() {
   const [toasts, setToasts] = useState([]);
-  const show = (message, type = "success") => {
+
+  const dismiss = (id) => setToasts((p) => p.filter((t) => t.id !== id));
+
+  const show = (message, type = "success", undoAction = null, duration = 2800) => {
     const id = uid();
-    setToasts((p) => [...p, { id, message, type }]);
-    setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 2800);
+    setToasts((p) => [...p, { id, message, type, undoAction }]);
+    const timer = setTimeout(() => {
+      dismiss(id);
+      // 언두가 없거나 이미 취소된 경우 → 아무것도 안 함 (삭제는 호출부에서 확정)
+    }, duration);
+    return { id, timer, cancel: () => { clearTimeout(timer); dismiss(id); } };
   };
-  return { toasts, show };
+
+  return { toasts, show, dismiss };
 }
-function ToastLayer({ toasts }) {
+
+function ToastLayer({ toasts, onUndo, onDismiss }) {
   if (!toasts.length) return null;
   return (
-    <div style={{ position: "fixed", top: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 430, zIndex: 9999, pointerEvents: "none", padding: "max(14px,env(safe-area-inset-top)) 16px 0" }}>
+    <div style={{ position:"fixed", top:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:430, zIndex:9999, pointerEvents:"none", padding:"max(14px,env(safe-area-inset-top)) 16px 0" }}>
       {toasts.map((t) => (
-        <div key={t.id} className={`toast toast-${t.type}`}>{t.message}</div>
+        <div key={t.id} className={`toast toast-${t.type}`} style={{ pointerEvents: t.undoAction ? "auto" : "none", display:"flex", alignItems:"center", justifyContent:"space-between", gap:10 }}>
+          <span>{t.message}</span>
+          {t.undoAction && (
+            <button
+              type="button"
+              onClick={() => { onUndo(t.id); t.undoAction(); }}
+              style={{ flexShrink:0, background:"rgba(255,255,255,.28)", border:"1px solid rgba(255,255,255,.4)", borderRadius:10, padding:"4px 10px", fontSize:12, fontWeight:900, color:"inherit", cursor:"pointer" }}
+            >취소</button>
+          )}
+        </div>
       ))}
     </div>
   );
@@ -972,13 +990,62 @@ function HospitalForm({ setData, setTab, initialData = null, onSave, showToast }
     </div>
   );
 }
-function PrepareForm({ data, setData }) {
+function PrepareForm({ data, setData, showToast }) {
   const [text, setText] = useState(""), [bucket, setBucket] = useState("");
-  const add = (key, value, clear) => { if (!value.trim()) return; setData((p) => ({ ...p, [key]: [...p[key], { id: uid(), text: value.trim(), done: false }] })); clear(""); };
+  const [hiddenIds, setHiddenIds] = useState(new Set());
+
+  const add = (key, value, clear) => {
+    if (!value.trim()) return;
+    setData((p) => ({ ...p, [key]: [...p[key], { id: uid(), text: value.trim(), done: false }] }));
+    clear("");
+  };
   const toggle = (key, id) => setData((p) => ({ ...p, [key]: p[key].map((item) => item.id === id ? { ...item, done: !item.done } : item) }));
-  const remove = (key, id) => setData((p) => ({ ...p, [key]: p[key].filter((item) => item.id !== id) }));
-  const List = ({ title, items, type }) => <section className="todo-section"><h3>{title}</h3>{items.map((item) => <div className="todo" key={item.id}><button className={item.done ? "check on" : "check"} onClick={() => toggle(type, item.id)}>{item.done ? "✓" : ""}</button><span className={item.done ? "done" : ""}>{item.text}</span><button onClick={() => remove(type, item.id)}>삭제</button></div>)}</section>;
-  return <div className="card pad"><h2 className="form-title">Chapter 5. 출산 준비 & 버킷리스트</h2><div className="add"><input value={text} onChange={(e) => setText(e.target.value)} placeholder="준비할 것 추가"/><button onClick={() => add("checklistItems", text, setText)}>추가</button></div><List title="출산 준비 체크리스트" items={data.checklistItems} type="checklistItems"/><div className="add"><input value={bucket} onChange={(e) => setBucket(e.target.value)} placeholder="하고 싶은 일 추가"/><button onClick={() => add("bucketListItems", bucket, setBucket)}>추가</button></div><List title="출산 전 버킷리스트" items={data.bucketListItems} type="bucketListItems"/></div>;
+
+  const remove = (key, id, label) => {
+    setHiddenIds((p) => new Set([...p, id]));
+    const timer = setTimeout(() => {
+      setData((p) => ({ ...p, [key]: p[key].filter((item) => item.id !== id) }));
+      setHiddenIds((p) => { const next = new Set(p); next.delete(id); return next; });
+    }, 4000);
+    showToast(
+      `"${label.slice(0, 14)}${label.length > 14 ? "…" : ""}" 삭제했어요.`,
+      "success",
+      () => {
+        clearTimeout(timer);
+        setHiddenIds((p) => { const next = new Set(p); next.delete(id); return next; });
+      },
+      4200
+    );
+  };
+
+  const List = ({ title, items, type }) => (
+    <section className="todo-section">
+      <h3>{title}</h3>
+      {items.filter((item) => !hiddenIds.has(item.id)).map((item) => (
+        <div className="todo" key={item.id}>
+          <button className={item.done ? "check on" : "check"} onClick={() => toggle(type, item.id)} aria-label={item.done ? "완료 취소" : "완료 표시"}>{item.done ? "✓" : ""}</button>
+          <span className={item.done ? "done" : ""}>{item.text}</span>
+          <button onClick={() => remove(type, item.id, item.text)} aria-label={`"${item.text}" 삭제`}>삭제</button>
+        </div>
+      ))}
+    </section>
+  );
+
+  return (
+    <div className="card pad">
+      <h2 className="form-title">Chapter 5. 출산 준비 & 버킷리스트</h2>
+      <div className="add">
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="준비할 것 추가" onKeyDown={(e) => e.key === "Enter" && add("checklistItems", text, setText)} aria-label="준비물 입력"/>
+        <button onClick={() => add("checklistItems", text, setText)}>추가</button>
+      </div>
+      <List title="출산 준비 체크리스트" items={data.checklistItems} type="checklistItems"/>
+      <div className="add">
+        <input value={bucket} onChange={(e) => setBucket(e.target.value)} placeholder="하고 싶은 일 추가" onKeyDown={(e) => e.key === "Enter" && add("bucketListItems", bucket, setBucket)} aria-label="버킷리스트 입력"/>
+        <button onClick={() => add("bucketListItems", bucket, setBucket)}>추가</button>
+      </div>
+      <List title="출산 전 버킷리스트" items={data.bucketListItems} type="bucketListItems"/>
+    </div>
+  );
 }
 
 function IntroStartPopup({ setWriteTab, setTab, onClose }) {
@@ -1110,17 +1177,43 @@ function Write({ data, setData, writeTab, setWriteTab, setTab, editTarget, setEd
           showToast={showToast}
         />
       )}
-      {safeWriteTab === "prepare" && <PrepareForm data={data} setData={setData}/>}
+      {safeWriteTab === "prepare" && <PrepareForm data={data} setData={setData} showToast={showToast}/>}
     </main>
   );
 }
-function Book({ data, setData, onEdit }) {
-  const remove = (key, id) => setData((p) => ({ ...p, [key]: p[key].filter((item) => item.id !== id) }));
+function Book({ data, setData, onEdit, showToast }) {
+  // 소프트 삭제: 숨긴 id 집합
+  const [hiddenIds, setHiddenIds] = useState(new Set());
+
+  const removeRecord = (key, r) => {
+    // 즉시 화면에서 숨김
+    setHiddenIds((p) => new Set([...p, r.id]));
+
+    // 4초 후 실제 삭제 예약
+    const timer = setTimeout(() => {
+      setData((p) => ({ ...p, [key]: p[key].filter((item) => item.id !== r.id) }));
+      setHiddenIds((p) => { const next = new Set(p); next.delete(r.id); return next; });
+    }, 4000);
+
+    // 토스트 + 언두
+    showToast(
+      "기록을 삭제했어요.",
+      "success",
+      () => {
+        clearTimeout(timer);
+        setHiddenIds((p) => { const next = new Set(p); next.delete(r.id); return next; });
+      },
+      4200
+    );
+  };
+
   const records = [
     ...data.dailyRecords.map((r) => ({ ...r, type: "daily" })),
     ...data.activityRecords.map((r) => ({ ...r, type: "activity" })),
     ...data.hospitalRecords.map((r) => ({ ...r, type: "hospital" })),
   ].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+
+  const visible = records.filter((r) => !hiddenIds.has(r.id));
 
   return (
     <main className="screen">
@@ -1131,9 +1224,9 @@ function Book({ data, setData, onEdit }) {
           <p>{data.babyInfo.dueDate ? `출산 예정일 ${fmtDate(data.babyInfo.dueDate)}` : "출산 예정일을 입력해보세요."}</p>
         </div>
       </section>
-      {records.length === 0 ? (
+      {visible.length === 0 ? (
         <div className="empty card">아직 저장된 기록이 없어요.<br/>오늘의 태교 장면을 먼저 기록해보세요.</div>
-      ) : records.map((r) => {
+      ) : visible.map((r) => {
         const key = r.type === "daily" ? "dailyRecords" : r.type === "activity" ? "activityRecords" : "hospitalRecords";
         return (
           <article className="record card" key={`${r.type}-${r.id}`} id={`record-${r.id}`}>
@@ -1146,21 +1239,22 @@ function Book({ data, setData, onEdit }) {
                 <button
                   onClick={() => onEdit(r)}
                   style={{background:"rgba(255,255,255,.8)",border:"1px solid rgba(164,122,142,.18)",borderRadius:"13px",cursor:"pointer",fontSize:"13px",padding:"6px 10px",fontWeight:"800",color:"#8b707c"}}
-                  title="기록 수정"
+                  aria-label="기록 수정하기"
                 >✏️ 수정</button>
                 <button
                   onClick={async () => { const el = document.getElementById(`record-${r.id}`); const canvas = await captureElement(el); await shareImage(canvas, `태교기록_${r.date}.png`); }}
                   style={{background:"rgba(255,255,255,.8)",border:"1px solid rgba(164,122,142,.18)",borderRadius:"13px",cursor:"pointer",fontSize:"13px",padding:"6px 10px",fontWeight:"800",color:"#8b707c"}}
-                  title="카드 이미지 공유"
+                  aria-label="카드 이미지 공유하기"
                 >📤 공유</button>
                 <button
                   onClick={async () => { await shareStoryCard(r, data.babyInfo.babyName); }}
                   style={{background:"linear-gradient(135deg,#f27ea5,#a78bfa)",border:"none",borderRadius:"13px",cursor:"pointer",fontSize:"13px",padding:"6px 10px",fontWeight:"800",color:"#fff"}}
-                  title="인스타 스토리용 이미지"
+                  aria-label="인스타그램 스토리용 이미지 만들기"
                 >📸 스토리</button>
                 <button
-                  onClick={() => remove(key, r.id)}
+                  onClick={() => removeRecord(key, r)}
                   style={{background:"rgba(255,255,255,.7)",border:"1px solid rgba(164,122,142,.18)",borderRadius:"13px",padding:"7px 10px",fontSize:"12px",fontWeight:"800",color:"#8b707c"}}
+                  aria-label="기록 삭제하기"
                 >삭제</button>
               </div>
             </div>
@@ -1703,7 +1797,7 @@ export default function App() {
   const [tab, setTab] = useState("home");
   const [writeTab, setWriteTab] = useState(() => isIntroWritten(data.babyInfo) ? "choose" : "intro");
   const [editTarget, setEditTarget] = useState(null);
-  const { toasts, show: showToast } = useToast();
+  const { toasts, show: showToast, dismiss } = useToast();
 
   useEffect(() => {
     if (writeTab === "intro" && isIntroWritten(data.babyInfo)) setWriteTab("choose");
@@ -1726,7 +1820,7 @@ export default function App() {
   return (
     <div className="app-shell" style={bgStyle}>
       <div className="ambient"/>
-      <ToastLayer toasts={toasts} />
+      <ToastLayer toasts={toasts} onUndo={dismiss} onDismiss={dismiss} />
       <BabyNamePopup data={data} setData={setData}/>
       <div className="app">
         <Header data={data}/>
@@ -1743,7 +1837,7 @@ export default function App() {
             showToast={showToast}
           />
         )}
-        {tab === "book" && <Book data={data} setData={setData} onEdit={handleEdit}/>}
+        {tab === "book" && <Book data={data} setData={setData} onEdit={handleEdit} showToast={showToast}/>}
         {tab === "settings" && <Settings data={data} setData={setData} setTab={setTab} showToast={showToast}/>}
         <nav className="bottom" aria-label="주요 메뉴">
           <button className={tab === "home" ? "on" : ""} onClick={() => setTab("home")} aria-label="홈" aria-current={tab === "home" ? "page" : undefined}><span aria-hidden="true">🏠</span>홈</button>
