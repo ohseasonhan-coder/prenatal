@@ -845,237 +845,423 @@ async function shareStoryCard(r, babyName) {
 async function exportPDF(data) {
   const loadScript = (src) => new Promise((res, rej) => {
     if (document.querySelector(`script[src="${src}"]`)) return res();
-    const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej;
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = res;
+    s.onerror = rej;
     document.head.appendChild(s);
   });
+
   await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
   await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+
   const { jsPDF } = window.jspdf;
-
-  const b = data.babyInfo;
-  const babyName = b.babyName || "우리 아기";
-  const records = [
-    ...data.dailyRecords.map(r => ({ ...r, type: "daily" })),
-    ...data.activityRecords.map(r => ({ ...r, type: "activity" })),
-    ...data.hospitalRecords.map(r => ({ ...r, type: "hospital" })),
-  ].sort((a, c) => new Date(a.date) - new Date(c.date));
-
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const W = 210, H = 297;
 
-  // 캡처용 컨테이너
+  const PDF_W = 210;
+  const PDF_H = 297;
+
+  // A4 @ 96dpi 기준. PDF로 들어가는 캡처 전용 사이즈입니다.
+  // 화면 CSS와 분리해서 PDF 출력 비율만 따로 안정화합니다.
+  const PAGE_W = 794;
+  const PAGE_H = 1123;
+  const PAD = 54;
+  const INNER_W = PAGE_W - PAD * 2;
+
+  // SceneComposer의 SVG viewBox가 420 x 260이므로 같은 비율로 PDF 이미지 박스를 잡습니다.
+  // 이렇게 해야 좌우/상하 여백이 생겨도 이미지가 잘리지 않고 비율대로 최대 확대됩니다.
+  const SCENE_RATIO = 260 / 420;
+  const IMAGE_W = INNER_W;
+  const IMAGE_H = Math.round(IMAGE_W * SCENE_RATIO);
+
+  const b = data.babyInfo || {};
+  const babyName = b.babyName || "우리 아기";
+
+  const records = [
+    ...(data.dailyRecords || []).map((r) => ({ ...r, type: "daily" })),
+    ...(data.activityRecords || []).map((r) => ({ ...r, type: "activity" })),
+    ...(data.hospitalRecords || []).map((r) => ({ ...r, type: "hospital" })),
+  ].sort((a, c) => new Date(a.date || 0) - new Date(c.date || 0));
+
+  const escapeHtml = (value = "") =>
+    String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+
+  const toParagraph = (value = "") => escapeHtml(value).replace(/\n/g, "<br/>");
+
+  const formatPdfDate = (value) => {
+    if (!value) return "날짜 없음";
+    const [y, m, d] = String(value).split("-");
+    if (!y || !m || !d) return escapeHtml(value);
+    return `${y}.${m}.${d}`;
+  };
+
+  const MOOD_COLORS = {
+    "사랑": "#f27ea5",
+    "설렘": "#f4a261",
+    "차분함": "#9b8ec4",
+    "편안함": "#6ab8c8",
+    "기쁨": "#f7d26e",
+    "평온": "#7dba8e",
+    "평온함": "#7dba8e",
+    "행복": "#efb542",
+    "감사": "#ef9ab7",
+    "기대감": "#ee9f48",
+    "따뜻함": "#ec9a5e",
+    "뿌듯함": "#77bd6a",
+  };
+
+  const TYPE_LABELS = {
+    daily: "임신 주차 기록",
+    activity: "태교 활동 기록",
+    hospital: "병원 · 건강 기록",
+  };
+
+  const TYPE_EMOJIS = {
+    daily: "📝",
+    activity: "🌿",
+    hospital: "🏥",
+  };
+
+  const baseStyle = `
+    font-family:'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    box-sizing:border-box;
+    line-height:1.65;
+    color:#3f3138;
+  `;
+
+  // 캡처용 래퍼: 실제 화면에는 보이지 않지만 렌더링은 되도록 화면 밖에 배치합니다.
   const wrap = document.createElement("div");
-  wrap.style.cssText = "position:fixed;top:0;left:0;width:794px;overflow:visible;pointer-events:none;opacity:0;";
+  wrap.style.cssText = `
+    position:fixed;
+    top:0;
+    left:-9999px;
+    width:${PAGE_W}px;
+    overflow:visible;
+    pointer-events:none;
+    background:#fff;
+    z-index:-1;
+  `;
   document.body.appendChild(wrap);
 
   const capture = async (el) => {
     wrap.innerHTML = "";
-    wrap.style.height = el.style.minHeight || el.style.height || "1123px";
     wrap.appendChild(el);
     await document.fonts.ready;
-    await new Promise(r => setTimeout(r, 200));
-    // 캡처 직전 잠깐 보이게 (브라우저 렌더링 강제)
-    wrap.style.opacity = "1";
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-    const canvas = await window.html2canvas(el, {
-      scale: 2, useCORS: true, allowTaint: true,
-      backgroundColor: "#ffffff", logging: false,
-      width: 794, height: parseInt(el.style.minHeight || el.style.height || "1123"),
-      windowWidth: 794,
+    await new Promise((r) => setTimeout(r, 180));
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    return window.html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+      width: PAGE_W,
+      height: PAGE_H,
+      windowWidth: PAGE_W,
+      windowHeight: PAGE_H,
+      scrollX: 0,
+      scrollY: 0,
     });
-    wrap.style.opacity = "0";
-    return canvas;
   };
 
-  const MOOD_COLORS = {
-    "사랑":"#f27ea5","설렘":"#f4a261","차분함":"#9b8ec4",
-    "편안함":"#6ab8c8","기쁨":"#f7d26e","평온":"#7dba8e",
-  };
-  const TYPE_LABELS = { daily:"임신 주차 기록", activity:"태교 활동", hospital:"병원 기록" };
-  const TYPE_EMOJIS = { daily:"📝", activity:"🌿", hospital:"🏥" };
-
-  const baseStyle = `
-    font-family:'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
-    box-sizing:border-box; line-height:1.7; color:#3f3138;
-  `;
-
-  // ── 커버 ──
-  const coverEl = document.createElement("div");
-  coverEl.style.cssText = `width:794px;height:1123px;${baseStyle}
-    background:linear-gradient(160deg,#fde8f0 0%,#fff5f9 50%,#fde8f0 100%);
-    display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px;position:relative;`;
-  coverEl.innerHTML = `
-    <div style="font-size:64px;margin-bottom:28px;">💗</div>
-    <h1 style="font-size:44px;color:#c0567a;margin:0 0 14px;font-weight:700;text-align:center;">${babyName}를 기다리며</h1>
-    <p style="font-size:20px;color:#e08ca8;margin:0 0 40px;">태교 일기</p>
-    <div style="width:80px;height:2px;background:#f2a0c0;margin-bottom:40px;border-radius:2px;"></div>
-    ${b.dueDate ? `<p style="font-size:15px;color:#c0829a;margin:6px 0;">출산 예정일 · ${b.dueDate}</p>` : ""}
-    ${b.motherName ? `<p style="font-size:15px;color:#c0829a;margin:6px 0;">작성자 · ${b.motherName}</p>` : ""}
-    <div style="margin-top:60px;display:flex;gap:24px;">
-      <span style="background:#fff0f5;color:#c0567a;padding:10px 20px;border-radius:24px;font-size:13px;font-weight:700;">📝 주차기록 ${data.dailyRecords.length}개</span>
-      <span style="background:#fff0f5;color:#c0567a;padding:10px 20px;border-radius:24px;font-size:13px;font-weight:700;">🌿 활동기록 ${data.activityRecords.length}개</span>
-      <span style="background:#fff0f5;color:#c0567a;padding:10px 20px;border-radius:24px;font-size:13px;font-weight:700;">🏥 병원기록 ${data.hospitalRecords.length}개</span>
-    </div>
-    <p style="position:absolute;bottom:40px;font-size:11px;color:#ddd;letter-spacing:.1em;">Prenatal Story Book</p>
-  `;
-  const coverCanvas = await capture(coverEl);
-  pdf.addImage(coverCanvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, W, H);
-
-  // ── 기록 페이지 ──
-  // SVG 안의 <image> href를 base64로 인라인화한 뒤 캔버스로 변환
+  // Book 탭에 렌더링된 SceneComposer SVG를 PDF용 PNG로 변환합니다.
   const svgToDataUrl = async (recordId) => {
     try {
       const article = document.getElementById(`record-${recordId}`);
       if (!article) return null;
+
       const sceneDiv = article.querySelector(".scene");
       if (!sceneDiv) return null;
+
       const svgEl = sceneDiv.querySelector("svg");
       if (!svgEl) return null;
 
-      // SVG 클론
       const clone = svgEl.cloneNode(true);
-      const images = clone.querySelectorAll("image");
+      clone.setAttribute("width", "840");
+      clone.setAttribute("height", "520");
 
-      // 각 <image href> 를 fetch → base64로 교체
+      const images = clone.querySelectorAll("image");
       await Promise.all([...images].map(async (img) => {
         const href = img.getAttribute("href") || img.getAttribute("xlink:href");
-        if (!href) return;
+        if (!href || href.startsWith("data:")) return;
+
         try {
           const res = await fetch(href);
           const blob = await res.blob();
-          const b64 = await new Promise(rv => {
-            const fr = new FileReader(); fr.onload = () => rv(fr.result); fr.readAsDataURL(blob);
+          const b64 = await new Promise((resolve) => {
+            const fr = new FileReader();
+            fr.onload = () => resolve(fr.result);
+            fr.readAsDataURL(blob);
           });
           img.setAttribute("href", b64);
-        } catch(e) { /* 실패 시 그냥 둠 */ }
+        } catch (e) {
+          // 이미지 인라인 실패 시에도 PDF 생성은 계속 진행합니다.
+        }
       }));
 
-      // SVG → Blob URL → Image → Canvas
       const svgStr = new XMLSerializer().serializeToString(clone);
       const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
       const url = URL.createObjectURL(blob);
-      const vb = svgEl.viewBox.baseVal;
-      const W = vb.width || 420, H = vb.height || 260;
 
-      return await new Promise((res) => {
+      return await new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
-          const cvs = document.createElement("canvas");
-          cvs.width = W * 2; cvs.height = H * 2;
-          const ctx = cvs.getContext("2d");
-          ctx.scale(2, 2);
-          ctx.drawImage(img, 0, 0, W, H);
+          const canvas = document.createElement("canvas");
+          canvas.width = 1680;
+          canvas.height = 1040;
+
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#fffafc";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
           URL.revokeObjectURL(url);
-          res(cvs.toDataURL("image/png"));
+          resolve(canvas.toDataURL("image/png"));
         };
-        img.onerror = () => { URL.revokeObjectURL(url); res(null); };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          resolve(null);
+        };
         img.src = url;
       });
-    } catch(e) { console.error(e); return null; }
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
   };
 
-  // A4 기준 상수 (794 x 1123px @96dpi)
-  const PAGE_W = 794, PAGE_H = 1123;
-  const PAD = 36;           // 페이지 여백
-  const GAP = 20;           // 카드 간격
-  const CARD_H = Math.floor((PAGE_H - PAD * 2 - GAP) / 2); // 카드 1개 높이 ≈ 515px
-  const IMG_H = Math.floor(CARD_H * 0.38); // 이미지 영역 높이 ≈ 196px (카드 38%)
-  const CARD_W = PAGE_W - PAD * 2;         // 카드 너비 ≈ 722px
-
-  // 기록 카드 HTML 생성 헬퍼
-  const makeCardHtml = (r, sceneDataUrl, idx, total) => {
-    const accent = MOOD_COLORS[r.mood] || "#f27ea5";
-    const light = accent + "18";
-
-    // 이미지: 씬/사진 모두 동일한 틀(CARD_W x IMG_H)에 object-fit:cover로 맞춤
-    const imgHtml = sceneDataUrl
-      ? `<div style="width:${CARD_W - 32}px;height:${IMG_H}px;border-radius:10px;overflow:hidden;margin-bottom:10px;flex-shrink:0;">
-           <img src="${sceneDataUrl}" style="width:100%;height:100%;object-fit:cover;display:block;" />
-         </div>`
-      : r.photo
-      ? `<div style="width:${CARD_W - 32}px;height:${IMG_H}px;border-radius:10px;overflow:hidden;margin-bottom:10px;flex-shrink:0;">
-           <img src="${r.photo}" style="width:100%;height:100%;object-fit:cover;display:block;" crossorigin="anonymous"/>
-         </div>`
-      : "";
-
-    const field = (label, val, extra = "") =>
-      val ? `<div style="margin-bottom:6px;">
-        <p style="font-size:9px;color:${accent};font-weight:700;margin:0 0 2px;letter-spacing:.04em;">${label}</p>
-        <div style="font-size:11px;color:#5a3a48;background:${light};padding:6px 10px;border-radius:7px;line-height:1.6;${extra}">${val}</div>
-      </div>` : "";
+  const makeImageBox = (src, alt = "태교북 이미지") => {
+    if (!src) return "";
 
     return `
       <div style="
-        width:${CARD_W}px; height:${CARD_H}px;
-        background:#fff; border-radius:14px;
-        border:1px solid ${accent}28;
-        box-shadow:0 3px 14px rgba(0,0,0,.06);
-        overflow:hidden; position:relative;
-        display:flex; flex-direction:column;
-        box-sizing:border-box;
+        width:${IMAGE_W}px;
+        height:${IMAGE_H}px;
+        border-radius:24px;
+        overflow:hidden;
+        background:#fff7fb;
+        border:1px solid rgba(236,154,188,.24);
+        box-shadow:0 12px 28px rgba(153,88,120,.12);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        flex-shrink:0;
       ">
-        <!-- 상단 컬러 바 -->
-        <div style="height:4px;background:${accent};flex-shrink:0;"></div>
-
-        <!-- 카드 내용 -->
-        <div style="padding:14px 16px;flex:1;overflow:hidden;display:flex;flex-direction:column;">
-          <!-- 헤더 -->
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-shrink:0;">
-            <span style="font-size:9px;color:${accent};font-weight:800;">${TYPE_EMOJIS[r.type]} ${TYPE_LABELS[r.type]}</span>
-            ${r.mood ? `<span style="font-size:9px;background:${light};color:${accent};padding:2px 8px;border-radius:999px;border:1px solid ${accent}44;">${r.mood}</span>` : ""}
-            <span style="font-size:9px;color:#aaa;margin-left:auto;">${idx} / ${total}</span>
-          </div>
-          <h3 style="font-size:16px;color:#3a2a32;margin:0 0 10px;font-weight:700;flex-shrink:0;">${r.date || "날짜 없음"}${r.week ? `&nbsp;·&nbsp;${r.week}` : ""}</h3>
-
-          <!-- 이미지 (씬 또는 사진, 동일 틀) -->
-          ${imgHtml}
-
-          <!-- 텍스트 내용 -->
-          <div style="flex:1;overflow:hidden;">
-            ${field("컨디션", r.condition)}
-            ${field("병원", r.hospital)}
-            ${field("검진 내용", r.checkup)}
-            ${field("오늘의 느낌", r.feeling)}
-            ${field("아기에게 한마디", r.message, `border-left:3px solid ${accent};`)}
-            ${field("오늘의 기억", r.memory)}
-            ${field("메모", r.memo)}
-          </div>
-        </div>
-      </div>`;
+        <img
+          src="${src}"
+          alt="${escapeHtml(alt)}"
+          crossorigin="anonymous"
+          style="
+            width:100%;
+            height:100%;
+            object-fit:contain;
+            object-position:center center;
+            display:block;
+          "
+        />
+      </div>
+    `;
   };
 
-  // 2개씩 묶어서 페이지 구성
-  for (let i = 0; i < records.length; i += 2) {
-    const r1 = records[i];
-    const r2 = records[i + 1] || null;
+  const field = (label, value, accent, options = {}) => {
+    if (!value) return "";
 
-    const [s1, s2] = await Promise.all([
-      svgToDataUrl(r1.id),
-      r2 ? svgToDataUrl(r2.id) : Promise.resolve(null),
-    ]);
+    const bg = options.strong ? `${accent}18` : "#fff";
+    const border = options.strong ? `border-left:5px solid ${accent};` : `border:1px solid ${accent}22;`;
+
+    return `
+      <div style="margin-bottom:12px;">
+        <div style="
+          font-size:12px;
+          color:${accent};
+          font-weight:800;
+          margin:0 0 5px;
+          letter-spacing:.02em;
+        ">${label}</div>
+        <div style="
+          font-size:15px;
+          color:#503744;
+          background:${bg};
+          ${border}
+          padding:11px 14px;
+          border-radius:12px;
+          line-height:1.65;
+          word-break:keep-all;
+        ">${toParagraph(value)}</div>
+      </div>
+    `;
+  };
+
+  const makeCoverPage = () => {
+    const coverMood = b.coverMood || "사랑";
+    const accent = MOOD_COLORS[coverMood] || "#f27ea5";
 
     const el = document.createElement("div");
     el.style.cssText = `
-      width:${PAGE_W}px; height:${PAGE_H}px;
+      width:${PAGE_W}px;
+      height:${PAGE_H}px;
       ${baseStyle}
-      background:#faf6f9;
+      background:
+        radial-gradient(circle at top left, ${accent}2b 0, transparent 340px),
+        linear-gradient(160deg,#fde8f0 0%,#fff8fb 48%,#fff1f7 100%);
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      padding:80px;
+      position:relative;
+      overflow:hidden;
+    `;
+
+    el.innerHTML = `
+      <div style="
+        width:520px;
+        min-height:520px;
+        border-radius:46px;
+        background:rgba(255,255,255,.62);
+        border:1px solid rgba(255,255,255,.9);
+        box-shadow:0 24px 70px rgba(165,88,128,.16);
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:center;
+        padding:54px 44px;
+        text-align:center;
+      ">
+        <div style="font-size:62px;margin-bottom:28px;">💗</div>
+        <div style="font-size:14px;color:${accent};font-weight:900;letter-spacing:.18em;margin-bottom:18px;">PRENATAL STORY BOOK</div>
+        <h1 style="font-size:44px;color:#49323d;margin:0 0 16px;font-weight:800;line-height:1.22;word-break:keep-all;">${escapeHtml(babyName)}를 기다리며</h1>
+        <p style="font-size:20px;color:${accent};margin:0 0 34px;font-weight:700;">태교북</p>
+        <div style="width:80px;height:2px;background:${accent};opacity:.5;margin-bottom:34px;border-radius:2px;"></div>
+        ${b.dueDate ? `<p style="font-size:15px;color:#8f6877;margin:6px 0;">출산 예정일 · ${formatPdfDate(b.dueDate)}</p>` : ""}
+        ${b.motherName ? `<p style="font-size:15px;color:#8f6877;margin:6px 0;">작성자 · ${escapeHtml(b.motherName)}</p>` : ""}
+        <div style="margin-top:42px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+          <span style="background:#fff0f5;color:${accent};padding:9px 16px;border-radius:24px;font-size:12px;font-weight:800;">📝 주차 ${data.dailyRecords.length}개</span>
+          <span style="background:#fff0f5;color:${accent};padding:9px 16px;border-radius:24px;font-size:12px;font-weight:800;">🌿 활동 ${data.activityRecords.length}개</span>
+          <span style="background:#fff0f5;color:${accent};padding:9px 16px;border-radius:24px;font-size:12px;font-weight:800;">🏥 병원 ${data.hospitalRecords.length}개</span>
+        </div>
+      </div>
+      <div style="position:absolute;bottom:42px;font-size:11px;color:#caa9b9;letter-spacing:.12em;">Made with love</div>
+    `;
+
+    return el;
+  };
+
+  const makeRecordPage = (record, imageSrc, idx, total) => {
+    const accent = MOOD_COLORS[record.mood] || "#f27ea5";
+    const light = `${accent}14`;
+    const typeLabel = TYPE_LABELS[record.type] || "태교 기록";
+    const typeEmoji = TYPE_EMOJIS[record.type] || "📖";
+
+    const title =
+      record.type === "daily"
+        ? `${formatPdfDate(record.date)}${record.week ? ` · ${escapeHtml(record.week)}` : ""}`
+        : record.type === "activity"
+        ? `${formatPdfDate(record.date)} · ${escapeHtml(getActivity(record.activity).label)}`
+        : `${formatPdfDate(record.date)}${record.week ? ` · ${escapeHtml(record.week)}` : ""}`;
+
+    const contentHtml = `
+      ${field("컨디션", record.condition, accent)}
+      ${field("함께한 사람", record.withWhom, accent)}
+      ${field("병원", record.hospital, accent)}
+      ${field("검진 내용", record.checkup, accent)}
+      ${field("오늘의 느낌", record.feeling, accent)}
+      ${field("아기에게 한마디", record.message, accent, { strong: true })}
+      ${field("오늘의 기억", record.memory, accent)}
+      ${field("메모", record.memo, accent)}
+      ${record.nextDate ? field("다음 진료일", formatPdfDate(record.nextDate), accent) : ""}
+    `;
+
+    const el = document.createElement("div");
+    el.style.cssText = `
+      width:${PAGE_W}px;
+      height:${PAGE_H}px;
+      ${baseStyle}
+      background:#fffafd;
       padding:${PAD}px;
       box-sizing:border-box;
-      display:flex; flex-direction:column; gap:${GAP}px;
+      position:relative;
+      overflow:hidden;
     `;
+
     el.innerHTML = `
-      ${makeCardHtml(r1, s1, i + 1, records.length)}
-      ${r2 ? makeCardHtml(r2, s2, i + 2, records.length) : `<div style="height:${CARD_H}px;"></div>`}
-      <div style="text-align:center;font-size:9px;color:#ddd;margin-top:auto;">${babyName}의 태교북 · Prenatal Story Book</div>
+      <div style="
+        height:100%;
+        display:flex;
+        flex-direction:column;
+      ">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-shrink:0;">
+          <div style="
+            width:42px;
+            height:42px;
+            border-radius:50%;
+            background:${light};
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:20px;
+          ">${typeEmoji}</div>
+          <div style="min-width:0;flex:1;">
+            <div style="font-size:13px;color:${accent};font-weight:900;letter-spacing:.04em;">${typeLabel}</div>
+            <h2 style="font-size:28px;color:#3f3138;margin:2px 0 0;line-height:1.25;word-break:keep-all;">${title}</h2>
+          </div>
+          <div style="font-size:12px;color:#b99bab;font-weight:800;">${idx} / ${total}</div>
+        </div>
+
+        ${makeImageBox(imageSrc, typeLabel)}
+
+        <div style="
+          margin-top:24px;
+          flex:1;
+          overflow:hidden;
+          padding:22px 24px;
+          border-radius:24px;
+          background:rgba(255,255,255,.86);
+          border:1px solid ${accent}22;
+          box-shadow:0 10px 28px rgba(153,88,120,.08);
+        ">
+          ${contentHtml || `<p style="font-size:15px;color:#8d7580;margin:0;">기록 내용이 아직 없어요.</p>`}
+        </div>
+
+        <div style="
+          text-align:center;
+          font-size:10px;
+          color:#d3bac6;
+          margin-top:18px;
+          flex-shrink:0;
+          letter-spacing:.06em;
+        ">${escapeHtml(babyName)}의 태교북 · Prenatal Story Book</div>
+      </div>
     `;
 
-    const canvas = await capture(el);
-    pdf.addPage();
-    pdf.addImage(canvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, W, H);
-  }
+    return el;
+  };
 
-  document.body.removeChild(wrap);
-  pdf.save(`${babyName}_태교북.pdf`);
+  try {
+    const coverCanvas = await capture(makeCoverPage());
+    pdf.addImage(coverCanvas.toDataURL("image/jpeg", 0.94), "JPEG", 0, 0, PDF_W, PDF_H);
+
+    for (let i = 0; i < records.length; i += 1) {
+      const record = records[i];
+      const sceneDataUrl = record.photo ? record.photo : await svgToDataUrl(record.id);
+
+      const pageEl = makeRecordPage(record, sceneDataUrl, i + 1, records.length);
+      const canvas = await capture(pageEl);
+
+      pdf.addPage();
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.94), "JPEG", 0, 0, PDF_W, PDF_H);
+    }
+
+    pdf.save(`${babyName}_태교북.pdf`);
+  } finally {
+    document.body.removeChild(wrap);
+  }
 }
 
 function Settings({ data, setData, setTab }) {
