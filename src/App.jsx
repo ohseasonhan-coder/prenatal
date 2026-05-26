@@ -185,6 +185,26 @@ const ACTIVITY_CROPS = {
   기도: { x: 14, y: 1, w: 1412, h: 1021 }
 };
 
+// ── 용량 유틸 ─────────────────────────────────────────
+const STORAGE_WARN_BYTES  = 4.5 * 1024 * 1024; // 4.5 MB — 경고
+const STORAGE_LIMIT_BYTES = 5   * 1024 * 1024; // 5 MB   — 사진 제거 후 재시도
+
+function calcStorageBytes(data) {
+  return new Blob([JSON.stringify(data)]).size;
+}
+
+/** 사진(photo 필드)을 모두 제거한 데이터를 반환 */
+function stripPhotos(data) {
+  const strip = (records) => records.map((r) => ({ ...r, photo: "" }));
+  return {
+    ...data,
+    babyInfo: { ...data.babyInfo, coverPhoto: "" },
+    dailyRecords:    strip(data.dailyRecords),
+    activityRecords: strip(data.activityRecords),
+    hospitalRecords: strip(data.hospitalRecords),
+  };
+}
+
 function usePlanner() {
   const [data, setData] = useState(() => {
     try {
@@ -194,17 +214,60 @@ function usePlanner() {
       return { ...INITIAL, ...parsed, babyInfo: { ...INITIAL.babyInfo, ...(parsed.babyInfo || {}) }, dailyRecords: parsed.dailyRecords || [], activityRecords: parsed.activityRecords || [], hospitalRecords: parsed.hospitalRecords || [], checklistItems: parsed.checklistItems || INITIAL.checklistItems, bucketListItems: parsed.bucketListItems || INITIAL.bucketListItems };
     } catch { return INITIAL; }
   });
-  useEffect(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(data)), [data]);
+
+  useEffect(() => {
+    const bytes = calcStorageBytes(data);
+    if (bytes >= STORAGE_LIMIT_BYTES) {
+      // 사진을 제거하고 재시도
+      try {
+        const stripped = stripPhotos(data);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(stripped));
+        console.warn("[태교북] 용량 초과 — 사진을 제거하고 저장했습니다.");
+      } catch (e) {
+        console.error("[태교북] 저장 실패:", e);
+      }
+    } else {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (e) {
+        console.error("[태교북] 저장 실패:", e);
+      }
+    }
+  }, [data]);
+
   return [data, setData];
 }
-function usePhotoUpload(onPhoto) {
+function usePhotoUpload(onPhoto, onError) {
   const ref = useRef(null);
   const trigger = () => ref.current?.click();
   const onChange = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => onPhoto(reader.result);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        // 최대 1200px로 리사이즈, JPEG quality 0.75 압축
+        const MAX = 1200;
+        let { width: w, height: h } = img;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else       { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        const compressed = canvas.toDataURL("image/jpeg", 0.75);
+        // 압축 후에도 1MB 초과면 거부
+        const sizeKB = Math.round(compressed.length * 0.75 / 1024);
+        if (compressed.length * 0.75 > 1 * 1024 * 1024) {
+          onError?.(`사진 용량이 너무 커요 (${sizeKB}KB). 더 작은 사진을 사용해주세요.`);
+          return;
+        }
+        onPhoto(compressed);
+      };
+      img.src = e.target.result;
+    };
     reader.readAsDataURL(file);
     event.target.value = "";
   };
@@ -449,10 +512,18 @@ function SceneComposer({ mood = "사랑", bg = "garden", character = "family", a
   };
   return <div className={`scene ${small ? "scene-small" : ""} ${large ? "scene-large" : ""}`} ref={sceneRef}><svg viewBox="0 0 420 260" role="img" aria-label="태교 일러스트"><defs><linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={m.sky[0]}/><stop offset="100%" stopColor={m.sky[1]}/></linearGradient></defs><g><rect width="420" height="260" fill={`url(#${gradId})`}/><BackgroundLayer bg={bg} mood={mood}/><path d="M210 70 C255 10 358 40 360 116 C362 185 286 214 210 235 C134 214 58 185 60 116 C62 40 165 10 210 70 Z" fill={m.accent} opacity=".42"/><LeafDecor mood={mood}/><MoodFx mood={mood}/><FamilyIllustration character={character} mood={mood}/><ActivityLayer activity={activity} mood={mood} character={character}/></g></svg>{editable && <button className="edit-float" type="button" onClick={onEdit} aria-label="그림 수정">✏️</button>}{!small && <button className="share-float" type="button" onClick={handleShare} disabled={sharing} aria-label="공유">{sharing ? "⏳" : "📤"}</button>}</div>;
 }
-function PhotoSlot({ photo, onPhoto, onRemove, small = false }) {
-  const { ref, trigger, onChange } = usePhotoUpload(onPhoto);
+function PhotoSlot({ photo, onPhoto, onRemove, small = false, onPhotoError }) {
+  const [photoErr, setPhotoErr] = useState("");
+  const handleError = (msg) => { setPhotoErr(msg); setTimeout(() => setPhotoErr(""), 4000); onPhotoError?.(msg); };
+  const { ref, trigger, onChange } = usePhotoUpload(onPhoto, handleError);
   if (photo) return <div className={`photo ${small ? "photo-small" : ""}`}><img src={photo} alt="업로드 사진" />{onRemove && <button className="photo-remove" type="button" onClick={onRemove}>×</button>}</div>;
-  return <><button type="button" className={`photo-add ${small ? "photo-add-small" : ""}`} onClick={trigger}>📷 사진으로 대체하기</button><input ref={ref} type="file" accept="image/*" hidden onChange={onChange}/></>;
+  return (
+    <>
+      <button type="button" className={`photo-add ${small ? "photo-add-small" : ""}`} onClick={trigger}>📷 사진으로 대체하기</button>
+      {photoErr && <span className="field-error" style={{display:"block",marginTop:6}}>{photoErr}</span>}
+      <input ref={ref} type="file" accept="image/*" hidden onChange={onChange}/>
+    </>
+  );
 }
 
 function SceneWizard({ scene, onChange, title = "그림 만들기" }) {
@@ -1143,7 +1214,7 @@ async function shareStoryCard(r, babyName) {
   await shareImage(canvas, `태교스토리_${r.date || "기록"}.png`);
 }
 
-async function exportPDF(data) {
+async function exportPDF(data, onProgress) {
   const loadScript = (src) => new Promise((res, rej) => {
     if (document.querySelector(`script[src="${src}"]`)) return res();
     const s = document.createElement("script");
@@ -1153,6 +1224,7 @@ async function exportPDF(data) {
     document.head.appendChild(s);
   });
 
+  onProgress?.({ step: "라이브러리 로드 중...", pct: 2 });
   await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
   await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
   const { jsPDF } = window.jspdf;
@@ -1173,6 +1245,7 @@ async function exportPDF(data) {
     ...data.hospitalRecords.map(r => ({ ...r, type: "hospital" })),
   ].sort((a, c) => new Date(a.date || 0) - new Date(c.date || 0));
 
+  const total = records.length;
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const W = 210;
   const H = 297;
@@ -1210,7 +1283,7 @@ async function exportPDF(data) {
     wrap.appendChild(el);
     await waitForImages(el);
     if (document.fonts?.ready) await document.fonts.ready;
-    await new Promise(r => setTimeout(r, 160));
+    await new Promise(r => setTimeout(r, 120));
     wrap.style.opacity = "1";
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
     const canvas = await window.html2canvas(el, {
@@ -1247,6 +1320,7 @@ async function exportPDF(data) {
   `;
 
   // ── 커버 ──
+  onProgress?.({ step: "표지 만드는 중...", pct: 5 });
   const coverEl = document.createElement("div");
   coverEl.style.cssText = `width:${PAGE_W}px;height:${PAGE_H}px;${baseStyle}
     background:linear-gradient(160deg,#fde8f0 0%,#fff5f9 50%,#fde8f0 100%);
@@ -1268,23 +1342,29 @@ async function exportPDF(data) {
   const coverCanvas = await capture(coverEl);
   pdf.addImage(coverCanvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, W, H);
 
-  // SVG 안의 <image> href를 base64로 인라인화한 뒤 캔버스로 변환
-  const svgToDataUrl = async (recordId) => {
+  // ── SVG 씬을 탭 이동 없이 직접 캡처 ──
+  // 기존 방식(setTab("book") + setTimeout)을 제거하고,
+  // wrap div에 인라인 img로 직접 그려서 캡처합니다.
+  const sceneToDataUrl = async (r) => {
+    // 사진이 있으면 사진 자체를 base64로 반환
+    if (r.photo) return r.photo;
+
+    // DOM에서 해당 레코드 article을 찾아 SVG를 복제
     try {
-      const article = document.getElementById(`record-${recordId}`);
-      if (!article) return null;
-      const sceneDiv = article.querySelector(".scene");
-      if (!sceneDiv) return null;
-      const svgEl = sceneDiv.querySelector("svg");
+      const article = document.getElementById(`record-${r.id}`);
+      const svgEl = article?.querySelector(".scene svg");
       if (!svgEl) return null;
 
       const clone = svgEl.cloneNode(true);
       const images = clone.querySelectorAll("image");
+
+      // SVG 내부 <image href="blob:..."> 를 base64로 교체
       await Promise.all([...images].map(async (img) => {
         const href = img.getAttribute("href") || img.getAttribute("xlink:href");
         if (!href || href.startsWith("data:")) return;
         try {
           const res = await fetch(href);
+          if (!res.ok) throw new Error(`fetch ${href} → ${res.status}`);
           const blob = await res.blob();
           const b64 = await new Promise(rv => {
             const fr = new FileReader();
@@ -1292,49 +1372,45 @@ async function exportPDF(data) {
             fr.readAsDataURL(blob);
           });
           img.setAttribute("href", b64);
-        } catch(e) {}
+        } catch (e) {
+          console.warn("[PDF] SVG 이미지 로드 실패, 빈 슬롯으로 대체:", e);
+          img.removeAttribute("href");
+        }
       }));
 
-      const svgStr = new XMLSerializer().serializeToString(clone);
-      const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
       const vb = svgEl.viewBox.baseVal;
       const sceneW = vb.width || 420;
       const sceneH = vb.height || 260;
+      const svgStr = new XMLSerializer().serializeToString(clone);
+      const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
 
       return await new Promise((res) => {
         const img = new Image();
         img.onload = () => {
           const cvs = document.createElement("canvas");
-          cvs.width = sceneW * 3;
-          cvs.height = sceneH * 3;
+          cvs.width = sceneW * 3; cvs.height = sceneH * 3;
           const ctx = cvs.getContext("2d");
           ctx.scale(3, 3);
           ctx.drawImage(img, 0, 0, sceneW, sceneH);
           URL.revokeObjectURL(url);
           res(cvs.toDataURL("image/png"));
         };
-        img.onerror = () => {
-          URL.revokeObjectURL(url);
-          res(null);
-        };
+        img.onerror = () => { URL.revokeObjectURL(url); res(null); };
         img.src = url;
       });
-    } catch(e) {
-      console.error(e);
+    } catch (e) {
+      console.warn("[PDF] 씬 캡처 실패:", e);
       return null;
     }
   };
 
-  // A4 한 장에 기록 1개를 넣습니다.
-  // 일러스트와 업로드 사진 모두 420:260 프레임으로 출력합니다.
-  // 사진은 프레임 안에서 원본 비율을 유지하므로 잘리거나 눌리지 않습니다.
   const PAD = 38;
   const CARD_W = PAGE_W - PAD * 2;
   const CARD_H = PAGE_H - PAD * 2 - 24;
   const INNER_W = CARD_W - 56;
-  const SCENE_H = Math.round(INNER_W * 260 / 420); // SceneComposer 원본 비율 420:260 유지
-  const IMAGE_FRAME_H = SCENE_H; // 사진도 일러스트와 같은 420:260 프레임 유지
+  const SCENE_H = Math.round(INNER_W * 260 / 420);
+  const IMAGE_FRAME_H = SCENE_H;
 
   const field = (label, val, accent, extra = "") => val ? `
     <div style="margin-bottom:12px;">
@@ -1343,82 +1419,27 @@ async function exportPDF(data) {
     </div>` : "";
 
   const imageHtml = (r, sceneDataUrl, accent) => {
-    if (sceneDataUrl) {
+    if (sceneDataUrl && !r.photo) {
       return `
         <div style="width:${INNER_W}px;margin:0 0 20px;flex-shrink:0;">
-          <img
-            src="${sceneDataUrl}"
-            style="
-              width:100%;
-              height:auto;
-              display:block;
-              border-radius:16px;
-              border:1px solid ${accent}20;
-              box-sizing:border-box;
-            "
-          />
+          <img src="${sceneDataUrl}" style="width:100%;height:auto;display:block;border-radius:16px;border:1px solid ${accent}20;box-sizing:border-box;" />
         </div>`;
     }
-
     if (r.photo) {
       return `
-        <div style="
-          width:${INNER_W}px;
-          height:${IMAGE_FRAME_H}px;
-          margin:0 0 20px;
-          flex-shrink:0;
-          border-radius:16px;
-          overflow:hidden;
-          background:#fffafc;
-          border:1px solid ${accent}24;
-          box-sizing:border-box;
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          padding:10px;
-        ">
-          <img
-            src="${r.photo}"
-            crossorigin="anonymous"
-            style="
-              max-width:100%;
-              max-height:100%;
-              width:auto;
-              height:auto;
-              display:block;
-              border-radius:12px;
-            "
-          />
+        <div style="width:${INNER_W}px;height:${IMAGE_FRAME_H}px;margin:0 0 20px;flex-shrink:0;border-radius:16px;overflow:hidden;background:#fffafc;border:1px solid ${accent}24;box-sizing:border-box;display:flex;align-items:center;justify-content:center;padding:10px;">
+          <img src="${r.photo}" crossorigin="anonymous" style="max-width:100%;max-height:100%;width:auto;height:auto;display:block;border-radius:12px;" />
         </div>`;
     }
-
     return "";
   };
 
   const makeRecordPageHtml = (r, sceneDataUrl, idx, total) => {
     const accent = MOOD_COLORS[r.mood] || "#f27ea5";
     const image = imageHtml(r, sceneDataUrl, accent);
-
     return `
-      <div style="
-        width:${PAGE_W}px;
-        height:${PAGE_H}px;
-        ${baseStyle}
-        background:#faf6f9;
-        padding:${PAD}px;
-        box-sizing:border-box;
-        position:relative;
-      ">
-        <div style="
-          width:${CARD_W}px;
-          height:${CARD_H}px;
-          background:#fff;
-          border-radius:22px;
-          border:1px solid ${accent}28;
-          box-shadow:0 8px 26px rgba(0,0,0,.055);
-          overflow:hidden;
-          box-sizing:border-box;
-        ">
+      <div style="width:${PAGE_W}px;height:${PAGE_H}px;${baseStyle}background:#faf6f9;padding:${PAD}px;box-sizing:border-box;position:relative;">
+        <div style="width:${CARD_W}px;height:${CARD_H}px;background:#fff;border-radius:22px;border:1px solid ${accent}28;box-shadow:0 8px 26px rgba(0,0,0,.055);overflow:hidden;box-sizing:border-box;">
           <div style="height:6px;background:${accent};"></div>
           <div style="padding:26px 28px;box-sizing:border-box;height:calc(100% - 6px);display:flex;flex-direction:column;">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-shrink:0;">
@@ -1426,13 +1447,10 @@ async function exportPDF(data) {
               ${r.mood ? `<span style="font-size:11px;background:${accent}12;color:${accent};padding:3px 10px;border-radius:999px;border:1px solid ${accent}34;">${safe(r.mood)}</span>` : ""}
               <span style="font-size:11px;color:#aaa;margin-left:auto;">${idx} / ${total}</span>
             </div>
-
             <h3 style="font-size:24px;color:#3a2a32;margin:0 0 18px;font-weight:800;line-height:1.25;flex-shrink:0;">
               ${safe(r.date || "날짜 없음")}${r.week ? `&nbsp;·&nbsp;${safe(r.week)}` : ""}
             </h3>
-
             ${image}
-
             <div style="flex:1;overflow:hidden;">
               ${field("컨디션", r.condition, accent)}
               ${field("병원", r.hospital, accent)}
@@ -1448,13 +1466,15 @@ async function exportPDF(data) {
       </div>`;
   };
 
-  for (let i = 0; i < records.length; i += 1) {
+  for (let i = 0; i < records.length; i++) {
     const r = records[i];
-    const sceneDataUrl = r.photo ? null : await svgToDataUrl(r.id);
+    const pct = Math.round(10 + (i / total) * 85);
+    onProgress?.({ step: `기록 ${i + 1} / ${total} 페이지 생성 중...`, pct });
 
+    const sceneDataUrl = await sceneToDataUrl(r);
     const el = document.createElement("div");
     el.style.cssText = `width:${PAGE_W}px;height:${PAGE_H}px;${baseStyle}`;
-    el.innerHTML = makeRecordPageHtml(r, sceneDataUrl, i + 1, records.length);
+    el.innerHTML = makeRecordPageHtml(r, sceneDataUrl, i + 1, total);
 
     const canvas = await capture(el);
     pdf.addPage();
@@ -1462,24 +1482,137 @@ async function exportPDF(data) {
   }
 
   document.body.removeChild(wrap);
+  onProgress?.({ step: "PDF 저장 중...", pct: 98 });
   pdf.save(`${babyName}_태교북.pdf`);
+  onProgress?.({ step: "완료!", pct: 100 });
 }
 
-function Settings({ data, setData, setTab }) {
+function Settings({ data, setData, setTab, showToast }) {
   const [exporting, setExporting] = useState(false);
-  const reset = () => { if (!confirm("저장된 태교북 기록을 모두 초기화할까요?")) return; localStorage.removeItem(STORAGE_KEY); setData(INITIAL); };
-  const clearCaches = async () => { if ("serviceWorker" in navigator) { const regs = await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map((reg) => reg.unregister())); } if ("caches" in window) { const keys = await caches.keys(); await Promise.all(keys.map((key) => caches.delete(key))); } alert("브라우저 캐시와 서비스워커를 정리했습니다. 새로고침해주세요."); };
+  const [progress, setProgress] = useState(null); // { step, pct }
+
+  // 용량 계산
+  const usedBytes = calcStorageBytes(data);
+  const usedKB = Math.round(usedBytes / 1024);
+  const usedMB = (usedBytes / (1024 * 1024)).toFixed(2);
+  const limitMB = 5;
+  const pct = Math.min(100, Math.round(usedBytes / STORAGE_LIMIT_BYTES * 100));
+  const isWarn  = usedBytes >= STORAGE_WARN_BYTES;
+  const isDanger = usedBytes >= STORAGE_LIMIT_BYTES;
+
+  const photoCount = [
+    data.babyInfo.coverPhoto,
+    ...data.dailyRecords.map((r) => r.photo),
+    ...data.activityRecords.map((r) => r.photo),
+    ...data.hospitalRecords.map((r) => r.photo),
+  ].filter(Boolean).length;
+
+  const reset = () => {
+    if (!confirm("저장된 태교북 기록을 모두 초기화할까요?")) return;
+    localStorage.removeItem(STORAGE_KEY);
+    setData(INITIAL);
+  };
+
+  const clearPhotos = () => {
+    if (!confirm(`저장된 사진 ${photoCount}장을 모두 삭제할까요?\n글·그림 기록은 유지됩니다.`)) return;
+    setData(stripPhotos(data));
+    showToast("🗑️ 사진을 모두 삭제했어요.");
+  };
+
+  const clearCaches = async () => {
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((reg) => reg.unregister()));
+    }
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
+    }
+    alert("브라우저 캐시와 서비스워커를 정리했습니다. 새로고침해주세요.");
+  };
+
   const handleExport = async () => {
     const total = data.dailyRecords.length + data.activityRecords.length + data.hospitalRecords.length;
     if (total === 0) { alert("저장된 기록이 없어요. 먼저 기록을 작성해보세요!"); return; }
     setExporting(true);
-    // 씬 캡처를 위해 태교북 탭으로 먼저 이동
-    setTab("book");
-    await new Promise(r => setTimeout(r, 600));
-    try { await exportPDF(data); } catch (e) { alert("PDF 생성 중 오류가 발생했어요. 다시 시도해주세요."); console.error(e); }
-    finally { setExporting(false); }
+    setProgress({ step: "준비 중...", pct: 0 });
+    try {
+      await exportPDF(data, (p) => setProgress(p));
+      showToast("💗 PDF가 저장됐어요!");
+    } catch (e) {
+      console.error(e);
+      showToast("PDF 생성 중 오류가 발생했어요. 다시 시도해주세요.", "error");
+    } finally {
+      setExporting(false);
+      setTimeout(() => setProgress(null), 1200);
+    }
   };
-  return <main className="screen"><section className="card pad"><h2 className="form-title">설정</h2><div style={{marginBottom:"24px"}}><h3 style={{margin:"0 0 8px",fontSize:"16px",color:"var(--deep)"}}>📄 태교북 PDF 내보내기</h3><p className="muted-text" style={{marginBottom:"12px"}}>지금까지 기록한 모든 내용을 예쁜 PDF로 저장해요.</p><button className="primary full" onClick={handleExport} disabled={exporting}>{exporting ? "⏳ PDF 생성 중..." : "💗 PDF로 내보내기"}</button></div><hr style={{border:"none",borderTop:"1px solid #f0e0e8",margin:"16px 0"}}/><p className="muted-text">화면이 예전 그대로 보이면 캐시 정리를 먼저 해주세요.</p><button className="ghost full" onClick={clearCaches}>서비스워커/캐시 정리</button><button className="danger full" onClick={reset}>기록 전체 초기화</button></section></main>;
+
+  const gaugeColor = isDanger ? "#c24f5d" : isWarn ? "#e8943a" : "var(--accent)";
+
+  return (
+    <main className="screen">
+      <section className="card pad">
+        <h2 className="form-title">설정</h2>
+
+        {/* 용량 현황 */}
+        <div style={{marginBottom:"22px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <h3 style={{margin:0,fontSize:"15px",color:"var(--deep)"}}>💾 저장 용량</h3>
+            <span style={{fontSize:"12px",fontWeight:800,color: isDanger ? "#c24f5d" : isWarn ? "#e8943a" : "#8b707c"}}>
+              {usedKB < 1024 ? `${usedKB} KB` : `${usedMB} MB`} / {limitMB} MB
+            </span>
+          </div>
+          <div style={{height:10,borderRadius:999,background:"rgba(164,122,142,.12)",overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${pct}%`,borderRadius:999,background:gaugeColor,transition:"width .4s"}} />
+          </div>
+          <p className="muted-text" style={{marginTop:6,fontSize:12}}>
+            {isDanger
+              ? "⚠️ 용량이 가득 찼어요. 사진을 삭제해야 새 기록이 안전하게 저장됩니다."
+              : isWarn
+              ? "⚠️ 용량이 거의 찼어요. 사진을 정리하는 것을 권장해요."
+              : "브라우저 localStorage 기준 최대 5MB까지 저장할 수 있어요."}
+          </p>
+          {photoCount > 0 && (
+            <button className="ghost full" style={{marginTop:4,color: isWarn ? "#e8943a" : undefined}} onClick={clearPhotos}>
+              🖼️ 사진 {photoCount}장 모두 삭제하기
+            </button>
+          )}
+        </div>
+
+        <hr style={{border:"none",borderTop:"1px solid #f0e0e8",margin:"4px 0 18px"}}/>
+
+        {/* PDF 내보내기 */}
+        <div style={{marginBottom:"20px"}}>
+          <h3 style={{margin:"0 0 8px",fontSize:"15px",color:"var(--deep)"}}>📄 태교북 PDF 내보내기</h3>
+          <p className="muted-text" style={{marginBottom:"12px"}}>지금까지 기록한 모든 내용을 예쁜 PDF로 저장해요.</p>
+
+          {/* 진행률 UI */}
+          {exporting && progress && (
+            <div style={{marginBottom:12,padding:"14px 16px",borderRadius:18,background:"rgba(255,255,255,.72)",border:"1px solid rgba(164,122,142,.14)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <span style={{fontSize:13,fontWeight:800,color:"var(--deep)"}}>{progress.step}</span>
+                <span style={{fontSize:12,fontWeight:900,color:"var(--accent)"}}>{progress.pct}%</span>
+              </div>
+              <div style={{height:8,borderRadius:999,background:"rgba(164,122,142,.12)",overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${progress.pct}%`,borderRadius:999,background:"var(--accent)",transition:"width .35s ease"}} />
+              </div>
+            </div>
+          )}
+
+          <button className="primary full" onClick={handleExport} disabled={exporting}>
+            {exporting ? "⏳ PDF 생성 중..." : "💗 PDF로 내보내기"}
+          </button>
+        </div>
+
+        <hr style={{border:"none",borderTop:"1px solid #f0e0e8",margin:"4px 0 18px"}}/>
+
+        <p className="muted-text">화면이 예전 그대로 보이면 캐시 정리를 먼저 해주세요.</p>
+        <button className="ghost full" onClick={clearCaches}>서비스워커/캐시 정리</button>
+        <button className="danger full" onClick={reset}>기록 전체 초기화</button>
+      </section>
+    </main>
+  );
 }
 export default function App() {
   const [data, setData] = usePlanner();
@@ -1527,7 +1660,7 @@ export default function App() {
           />
         )}
         {tab === "book" && <Book data={data} setData={setData} onEdit={handleEdit}/>}
-        {tab === "settings" && <Settings data={data} setData={setData} setTab={setTab}/>}
+        {tab === "settings" && <Settings data={data} setData={setData} setTab={setTab} showToast={showToast}/>}
         <nav className="bottom">
           <button className={tab === "home" ? "on" : ""} onClick={() => setTab("home")}><span>🏠</span>홈</button>
           <button className={tab === "write" ? "on" : ""} onClick={openWrite}><span>✍️</span>기록</button>
