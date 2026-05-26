@@ -51,6 +51,26 @@ const fmtDate = (value) => {
 };
 const sortByDate = (list) => [...list].sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.createdAt || "").localeCompare(b.createdAt || ""));
 
+// 출산 예정일 기준 D-day / 임신 주차 / 진행률 계산
+// 임신 기간 = 280일(40주). 예정일로부터 역산해 임신 시작일을 구함
+function calcPregnancy(dueDate) {
+  if (!dueDate) return null;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const due = new Date(dueDate); due.setHours(0, 0, 0, 0);
+  const diffMs = due - now;
+  const dDays = Math.round(diffMs / 86400000); // 양수 = 남은 날, 음수 = 지남
+
+  // 임신 시작일 = 예정일 - 280일
+  const TOTAL_DAYS = 280;
+  const start = new Date(due); start.setDate(start.getDate() - TOTAL_DAYS);
+  const elapsed = Math.round((now - start) / 86400000);
+  const clampedElapsed = Math.max(0, Math.min(TOTAL_DAYS, elapsed));
+  const weekNum = Math.floor(clampedElapsed / 7) + 1; // 1주차~40주차
+  const pct = Math.round((clampedElapsed / TOTAL_DAYS) * 100);
+
+  return { dDays, weekNum, pct, passed: dDays < 0 };
+}
+
 const MOODS = [
   { id: "설렘", label: "설렘", emoji: "💗", sky: ["#fff0f7", "#fffafd"], accent: "#ee8bb2", deep: "#b85e82", mark: "♡" },
   { id: "행복", label: "행복", emoji: "☀️", sky: ["#fff3cb", "#fffaf0"], accent: "#efb542", deep: "#a87517", mark: "✦" },
@@ -756,22 +776,96 @@ function BabyNamePopup({ data, setData }) {
 }
 
 function Header({ data }) {
+  const preg = calcPregnancy(data.babyInfo.dueDate);
   return (
     <header className="topbar" role="banner">
       <div>
         <p>Mobile Taegyo Book</p>
         <h1>{data.babyInfo.babyName || "우리 아기"}의 태교북</h1>
       </div>
-      <span aria-hidden="true">{getMood(data.babyInfo.coverMood).emoji}</span>
+      {preg ? (
+        <div className="header-dday" aria-label={preg.passed ? `출산 ${Math.abs(preg.dDays)}일 지남` : `출산까지 ${preg.dDays}일`}>
+          <span className="header-dday-label">{preg.passed ? "D+" : "D-"}</span>
+          <span className="header-dday-num">{Math.abs(preg.dDays)}</span>
+        </div>
+      ) : (
+        <span aria-hidden="true">{getMood(data.babyInfo.coverMood).emoji}</span>
+      )}
     </header>
   );
 }
 function Home({ data, setData, setTab, setWriteTab }) {
   const b = data.babyInfo;
+  const preg = calcPregnancy(b.dueDate);
   const updateCover = (scene) => setData((p) => ({ ...p, babyInfo: { ...p.babyInfo, coverMood: scene.mood, coverBg: scene.bg, coverChar: scene.character, coverActivity: scene.activity } }));
   const updatePhoto = (photo) => setData((p) => ({ ...p, babyInfo: { ...p.babyInfo, coverPhoto: photo } }));
   const coverScene = { mood: b.coverMood, bg: b.coverBg, character: b.coverChar, activity: b.coverActivity };
-  return <main className="screen"><section className="hero card">{b.coverPhoto ? <PhotoSlot photo={b.coverPhoto} onPhoto={updatePhoto} onRemove={() => updatePhoto("")} /> : <SceneWizard scene={coverScene} onChange={updateCover} title="커버 그림 수정"/>}<div className="photo-line"><PhotoSlot photo={b.coverPhoto} onPhoto={updatePhoto} onRemove={() => updatePhoto("")} /></div><div className="hero-copy"><h2>{b.babyName || "우리 아기"}를 기다리는 그림일기</h2><p>기분, 배경, 인물, 태교 활동을 순서대로 골라 기록하는 모바일 태교북입니다.</p></div></section><section className="quick-grid">{[["✍️", "오늘 기록", "daily"], ["🌿", "태교 활동", "activity"], ["🏥", "병원 기록", "hospital"], ["📦", "출산 준비", "prepare"]].map(([icon, label, tab]) => <button key={tab} className="quick" onClick={() => { setWriteTab(isIntroWritten(b) ? tab : "intro"); setTab("write"); }}><span>{icon}</span>{label}</button>)}</section><section className="card pad"><div className="section-head"><h3>기록 현황</h3></div><div className="stats"><div><strong>{data.dailyRecords.length}</strong><span>주차 기록</span></div><div><strong>{data.activityRecords.length}</strong><span>활동 기록</span></div><div><strong>{data.hospitalRecords.length}</strong><span>병원 기록</span></div></div></section></main>;
+
+  return (
+    <main className="screen">
+      <section className="hero card">
+        {b.coverPhoto
+          ? <PhotoSlot photo={b.coverPhoto} onPhoto={updatePhoto} onRemove={() => updatePhoto("")} />
+          : <SceneWizard scene={coverScene} onChange={updateCover} title="커버 그림 수정"/>
+        }
+        <div className="photo-line"><PhotoSlot photo={b.coverPhoto} onPhoto={updatePhoto} onRemove={() => updatePhoto("")} /></div>
+        <div className="hero-copy">
+          <h2>{b.babyName || "우리 아기"}를 기다리는 그림일기</h2>
+          <p>기분, 배경, 인물, 태교 활동을 순서대로 골라 기록하는 모바일 태교북입니다.</p>
+        </div>
+      </section>
+
+      {/* D-day 배너 */}
+      {preg && (
+        <section className="card pad dday-card" aria-label="임신 진행 현황">
+          <div className="dday-top">
+            <div className="dday-info">
+              {preg.passed ? (
+                <>
+                  <span className="dday-num">D+{Math.abs(preg.dDays)}</span>
+                  <span className="dday-label">출산 예정일이 지났어요 🎉</span>
+                </>
+              ) : (
+                <>
+                  <span className="dday-num">D-{preg.dDays}</span>
+                  <span className="dday-label">출산까지 {preg.dDays}일 남았어요</span>
+                </>
+              )}
+            </div>
+            <div className="dday-week">
+              <strong>{Math.min(preg.weekNum, 40)}주차</strong>
+              <span>/ 40주</span>
+            </div>
+          </div>
+          {/* 진행 바 */}
+          <div className="dday-bar-wrap" aria-label={`임신 진행률 ${preg.pct}%`}>
+            <div className="dday-bar">
+              <div className="dday-bar-fill" style={{ width: `${preg.pct}%` }} />
+            </div>
+            <span className="dday-pct">{preg.pct}%</span>
+          </div>
+          <p className="dday-due muted-text">출산 예정일 {fmtDate(b.dueDate)}</p>
+        </section>
+      )}
+
+      <section className="quick-grid">
+        {[["✍️", "오늘 기록", "daily"], ["🌿", "태교 활동", "activity"], ["🏥", "병원 기록", "hospital"], ["📦", "출산 준비", "prepare"]].map(([icon, label, tab]) => (
+          <button key={tab} className="quick" onClick={() => { setWriteTab(isIntroWritten(b) ? tab : "intro"); setTab("write"); }}>
+            <span aria-hidden="true">{icon}</span>{label}
+          </button>
+        ))}
+      </section>
+
+      <section className="card pad">
+        <div className="section-head"><h3>기록 현황</h3></div>
+        <div className="stats">
+          <div><strong>{data.dailyRecords.length}</strong><span>주차 기록</span></div>
+          <div><strong>{data.activityRecords.length}</strong><span>활동 기록</span></div>
+          <div><strong>{data.hospitalRecords.length}</strong><span>병원 기록</span></div>
+        </div>
+      </section>
+    </main>
+  );
 }
 function IntroForm({ data, setData, setWriteTab }) {
   const b = data.babyInfo;
