@@ -845,72 +845,118 @@ async function shareStoryCard(r, babyName) {
 async function exportPDF(data) {
   const loadScript = (src) => new Promise((res, rej) => {
     if (document.querySelector(`script[src="${src}"]`)) return res();
-    const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej;
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = res;
+    s.onerror = rej;
     document.head.appendChild(s);
   });
+
   await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
   await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
   const { jsPDF } = window.jspdf;
 
-  const b = data.babyInfo;
+  const safe = (value = "") => String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;")
+    .replace(/\n/g, "<br/>");
+
+  const b = data.babyInfo || {};
   const babyName = b.babyName || "우리 아기";
   const records = [
     ...data.dailyRecords.map(r => ({ ...r, type: "daily" })),
     ...data.activityRecords.map(r => ({ ...r, type: "activity" })),
     ...data.hospitalRecords.map(r => ({ ...r, type: "hospital" })),
-  ].sort((a, c) => new Date(a.date) - new Date(c.date));
+  ].sort((a, c) => new Date(a.date || 0) - new Date(c.date || 0));
 
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const W = 210, H = 297;
+  const W = 210;
+  const H = 297;
+  const PAGE_W = 794;
+  const PAGE_H = 1123;
 
-  // 캡처용 컨테이너
   const wrap = document.createElement("div");
-  wrap.style.cssText = "position:fixed;top:0;left:0;width:794px;overflow:visible;pointer-events:none;opacity:0;";
+  wrap.style.cssText = `
+    position:fixed;
+    top:0;
+    left:0;
+    width:${PAGE_W}px;
+    height:${PAGE_H}px;
+    overflow:hidden;
+    pointer-events:none;
+    opacity:0;
+    z-index:-1;
+  `;
   document.body.appendChild(wrap);
+
+  const waitForImages = async (root) => {
+    const imgs = [...root.querySelectorAll("img")];
+    await Promise.all(imgs.map((img) => {
+      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+      return new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve;
+      });
+    }));
+    await Promise.all(imgs.map((img) => img.decode ? img.decode().catch(() => {}) : Promise.resolve()));
+  };
 
   const capture = async (el) => {
     wrap.innerHTML = "";
-    wrap.style.height = el.style.minHeight || el.style.height || "1123px";
     wrap.appendChild(el);
-    await document.fonts.ready;
-    await new Promise(r => setTimeout(r, 200));
-    // 캡처 직전 잠깐 보이게 (브라우저 렌더링 강제)
+    await waitForImages(el);
+    if (document.fonts?.ready) await document.fonts.ready;
+    await new Promise(r => setTimeout(r, 160));
     wrap.style.opacity = "1";
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
     const canvas = await window.html2canvas(el, {
-      scale: 2, useCORS: true, allowTaint: true,
-      backgroundColor: "#ffffff", logging: false,
-      width: 794, height: parseInt(el.style.minHeight || el.style.height || "1123"),
-      windowWidth: 794,
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+      width: PAGE_W,
+      height: PAGE_H,
+      windowWidth: PAGE_W,
+      windowHeight: PAGE_H,
+      scrollX: 0,
+      scrollY: 0,
     });
     wrap.style.opacity = "0";
     return canvas;
   };
 
   const MOOD_COLORS = {
-    "사랑":"#f27ea5","설렘":"#f4a261","차분함":"#9b8ec4",
-    "편안함":"#6ab8c8","기쁨":"#f7d26e","평온":"#7dba8e",
+    "사랑":"#f27ea5", "설렘":"#ee8bb2", "감사":"#ef9ab7", "행복":"#efb542",
+    "차분함":"#9789dd", "편안함":"#75b7e8", "기대감":"#ee9f48", "피곤함":"#91a6b2",
+    "감동":"#e98585", "신남":"#ee8f59", "두근두근":"#d97bc6", "따뜻함":"#ec9a5e",
+    "뿌듯함":"#77bd6a", "평온함":"#6ac79b", "울컥함":"#8fa2f5", "용기":"#ee9b45",
   };
   const TYPE_LABELS = { daily:"임신 주차 기록", activity:"태교 활동", hospital:"병원 기록" };
   const TYPE_EMOJIS = { daily:"📝", activity:"🌿", hospital:"🏥" };
 
   const baseStyle = `
     font-family:'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
-    box-sizing:border-box; line-height:1.7; color:#3f3138;
+    box-sizing:border-box;
+    line-height:1.7;
+    color:#3f3138;
   `;
 
   // ── 커버 ──
   const coverEl = document.createElement("div");
-  coverEl.style.cssText = `width:794px;height:1123px;${baseStyle}
+  coverEl.style.cssText = `width:${PAGE_W}px;height:${PAGE_H}px;${baseStyle}
     background:linear-gradient(160deg,#fde8f0 0%,#fff5f9 50%,#fde8f0 100%);
     display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px;position:relative;`;
   coverEl.innerHTML = `
     <div style="font-size:64px;margin-bottom:28px;">💗</div>
-    <h1 style="font-size:44px;color:#c0567a;margin:0 0 14px;font-weight:700;text-align:center;">${babyName}를 기다리며</h1>
+    <h1 style="font-size:44px;color:#c0567a;margin:0 0 14px;font-weight:700;text-align:center;">${safe(babyName)}를 기다리며</h1>
     <p style="font-size:20px;color:#e08ca8;margin:0 0 40px;">태교 일기</p>
     <div style="width:80px;height:2px;background:#f2a0c0;margin-bottom:40px;border-radius:2px;"></div>
-    ${b.dueDate ? `<p style="font-size:15px;color:#c0829a;margin:6px 0;">출산 예정일 · ${b.dueDate}</p>` : ""}
-    ${b.motherName ? `<p style="font-size:15px;color:#c0829a;margin:6px 0;">작성자 · ${b.motherName}</p>` : ""}
+    ${b.dueDate ? `<p style="font-size:15px;color:#c0829a;margin:6px 0;">출산 예정일 · ${safe(b.dueDate)}</p>` : ""}
+    ${b.motherName ? `<p style="font-size:15px;color:#c0829a;margin:6px 0;">작성자 · ${safe(b.motherName)}</p>` : ""}
     <div style="margin-top:60px;display:flex;gap:24px;">
       <span style="background:#fff0f5;color:#c0567a;padding:10px 20px;border-radius:24px;font-size:13px;font-weight:700;">📝 주차기록 ${data.dailyRecords.length}개</span>
       <span style="background:#fff0f5;color:#c0567a;padding:10px 20px;border-radius:24px;font-size:13px;font-weight:700;">🌿 활동기록 ${data.activityRecords.length}개</span>
@@ -921,7 +967,6 @@ async function exportPDF(data) {
   const coverCanvas = await capture(coverEl);
   pdf.addImage(coverCanvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, W, H);
 
-  // ── 기록 페이지 ──
   // SVG 안의 <image> href를 base64로 인라인화한 뒤 캔버스로 변환
   const svgToDataUrl = async (recordId) => {
     try {
@@ -932,169 +977,182 @@ async function exportPDF(data) {
       const svgEl = sceneDiv.querySelector("svg");
       if (!svgEl) return null;
 
-      // SVG 클론
       const clone = svgEl.cloneNode(true);
       const images = clone.querySelectorAll("image");
-
-      // 각 <image href> 를 fetch → base64로 교체
       await Promise.all([...images].map(async (img) => {
         const href = img.getAttribute("href") || img.getAttribute("xlink:href");
-        if (!href) return;
+        if (!href || href.startsWith("data:")) return;
         try {
           const res = await fetch(href);
           const blob = await res.blob();
           const b64 = await new Promise(rv => {
-            const fr = new FileReader(); fr.onload = () => rv(fr.result); fr.readAsDataURL(blob);
+            const fr = new FileReader();
+            fr.onload = () => rv(fr.result);
+            fr.readAsDataURL(blob);
           });
           img.setAttribute("href", b64);
-        } catch(e) { /* 실패 시 그냥 둠 */ }
+        } catch(e) {}
       }));
 
-      // SVG → Blob URL → Image → Canvas
       const svgStr = new XMLSerializer().serializeToString(clone);
       const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const vb = svgEl.viewBox.baseVal;
-      const W = vb.width || 420, H = vb.height || 260;
+      const sceneW = vb.width || 420;
+      const sceneH = vb.height || 260;
 
       return await new Promise((res) => {
         const img = new Image();
         img.onload = () => {
           const cvs = document.createElement("canvas");
-          cvs.width = W * 2; cvs.height = H * 2;
+          cvs.width = sceneW * 3;
+          cvs.height = sceneH * 3;
           const ctx = cvs.getContext("2d");
-          ctx.scale(2, 2);
-          ctx.drawImage(img, 0, 0, W, H);
+          ctx.scale(3, 3);
+          ctx.drawImage(img, 0, 0, sceneW, sceneH);
           URL.revokeObjectURL(url);
           res(cvs.toDataURL("image/png"));
         };
-        img.onerror = () => { URL.revokeObjectURL(url); res(null); };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          res(null);
+        };
         img.src = url;
       });
-    } catch(e) { console.error(e); return null; }
+    } catch(e) {
+      console.error(e);
+      return null;
+    }
   };
 
-  // A4 기준 상수 (794 x 1123px @96dpi)
-  const PAGE_W = 794, PAGE_H = 1123;
-  const PAD = 36;           // 페이지 여백
-  const GAP = 20;           // 카드 간격
-  const CARD_H = Math.floor((PAGE_H - PAD * 2 - GAP) / 2); // 카드 1개 높이 ≈ 515px
-  const IMG_H = Math.floor(CARD_H * 0.38); // 이미지 영역 높이 ≈ 196px (카드 38%)
-  const CARD_W = PAGE_W - PAD * 2;         // 카드 너비 ≈ 722px
+  // A4 한 장에 기록 1개를 넣습니다.
+  // 이전처럼 한 페이지에 2개를 넣으면 이미지 박스가 낮아져서 위아래로 눌려 보입니다.
+  const PAD = 38;
+  const CARD_W = PAGE_W - PAD * 2;
+  const CARD_H = PAGE_H - PAD * 2 - 24;
+  const INNER_W = CARD_W - 56;
+  const SCENE_H = Math.round(INNER_W * 260 / 420); // SceneComposer 원본 비율 420:260 유지
+  const PHOTO_MAX_H = 560; // 업로드 사진은 이 박스 안에서 원본 비율 유지
 
-  // 기록 카드 HTML 생성 헬퍼
-  const makeCardHtml = (r, sceneDataUrl, idx, total) => {
+  const field = (label, val, accent, extra = "") => val ? `
+    <div style="margin-bottom:12px;">
+      <p style="font-size:12px;color:${accent};font-weight:800;margin:0 0 4px;letter-spacing:.02em;">${safe(label)}</p>
+      <div style="font-size:15px;color:#5a3a48;background:${accent}12;padding:10px 14px;border-radius:11px;line-height:1.65;${extra}">${safe(val)}</div>
+    </div>` : "";
+
+  const imageHtml = (r, sceneDataUrl, accent) => {
+    if (sceneDataUrl) {
+      return `
+        <div style="width:${INNER_W}px;margin:0 0 20px;flex-shrink:0;">
+          <img
+            src="${sceneDataUrl}"
+            style="
+              width:100%;
+              height:auto;
+              display:block;
+              border-radius:16px;
+              border:1px solid ${accent}20;
+              box-sizing:border-box;
+            "
+          />
+        </div>`;
+    }
+
+    if (r.photo) {
+      return `
+        <div style="
+          width:${INNER_W}px;
+          height:${PHOTO_MAX_H}px;
+          margin:0 0 20px;
+          flex-shrink:0;
+          border-radius:16px;
+          overflow:hidden;
+          background:#fffafc;
+          border:1px solid ${accent}24;
+          box-sizing:border-box;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          padding:12px;
+        ">
+          <img
+            src="${r.photo}"
+            crossorigin="anonymous"
+            style="
+              max-width:100%;
+              max-height:100%;
+              width:auto;
+              height:auto;
+              display:block;
+              border-radius:12px;
+            "
+          />
+        </div>`;
+    }
+
+    return "";
+  };
+
+  const makeRecordPageHtml = (r, sceneDataUrl, idx, total) => {
     const accent = MOOD_COLORS[r.mood] || "#f27ea5";
-    const light = accent + "18";
-
-    // 이미지: 그림은 cover 유지, 업로드 사진은 원본 비율을 유지하도록 contain으로 분리
-    const photoBoxH = Math.floor(IMG_H * 1.18);
-
-    const imgHtml = sceneDataUrl
-      ? `<div style="width:${CARD_W - 32}px;height:${IMG_H}px;border-radius:10px;overflow:hidden;margin-bottom:10px;flex-shrink:0;background:#fff;">
-           <img src="${sceneDataUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center center;display:block;" />
-         </div>`
-      : r.photo
-      ? `<div style="
-           width:${CARD_W - 32}px;
-           height:${photoBoxH}px;
-           border-radius:12px;
-           overflow:hidden;
-           margin-bottom:10px;
-           flex-shrink:0;
-           background:#fffafc;
-           border:1px solid ${accent}22;
-           box-sizing:border-box;
-           display:flex;
-           align-items:center;
-           justify-content:center;
-           padding:8px;
-         ">
-           <img
-             src="${r.photo}"
-             style="
-               width:100%;
-               height:100%;
-               object-fit:contain;
-               object-position:center center;
-               display:block;
-               border-radius:8px;
-             "
-             crossorigin="anonymous"
-           />
-         </div>`
-      : "";
-
-    const field = (label, val, extra = "") =>
-      val ? `<div style="margin-bottom:6px;">
-        <p style="font-size:9px;color:${accent};font-weight:700;margin:0 0 2px;letter-spacing:.04em;">${label}</p>
-        <div style="font-size:11px;color:#5a3a48;background:${light};padding:6px 10px;border-radius:7px;line-height:1.6;${extra}">${val}</div>
-      </div>` : "";
+    const image = imageHtml(r, sceneDataUrl, accent);
 
     return `
       <div style="
-        width:${CARD_W}px; height:${CARD_H}px;
-        background:#fff; border-radius:14px;
-        border:1px solid ${accent}28;
-        box-shadow:0 3px 14px rgba(0,0,0,.06);
-        overflow:hidden; position:relative;
-        display:flex; flex-direction:column;
+        width:${PAGE_W}px;
+        height:${PAGE_H}px;
+        ${baseStyle}
+        background:#faf6f9;
+        padding:${PAD}px;
         box-sizing:border-box;
+        position:relative;
       ">
-        <!-- 상단 컬러 바 -->
-        <div style="height:4px;background:${accent};flex-shrink:0;"></div>
+        <div style="
+          width:${CARD_W}px;
+          height:${CARD_H}px;
+          background:#fff;
+          border-radius:22px;
+          border:1px solid ${accent}28;
+          box-shadow:0 8px 26px rgba(0,0,0,.055);
+          overflow:hidden;
+          box-sizing:border-box;
+        ">
+          <div style="height:6px;background:${accent};"></div>
+          <div style="padding:26px 28px;box-sizing:border-box;height:calc(100% - 6px);display:flex;flex-direction:column;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-shrink:0;">
+              <span style="font-size:12px;color:${accent};font-weight:900;">${TYPE_EMOJIS[r.type]} ${TYPE_LABELS[r.type]}</span>
+              ${r.mood ? `<span style="font-size:11px;background:${accent}12;color:${accent};padding:3px 10px;border-radius:999px;border:1px solid ${accent}34;">${safe(r.mood)}</span>` : ""}
+              <span style="font-size:11px;color:#aaa;margin-left:auto;">${idx} / ${total}</span>
+            </div>
 
-        <!-- 카드 내용 -->
-        <div style="padding:14px 16px;flex:1;overflow:hidden;display:flex;flex-direction:column;">
-          <!-- 헤더 -->
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-shrink:0;">
-            <span style="font-size:9px;color:${accent};font-weight:800;">${TYPE_EMOJIS[r.type]} ${TYPE_LABELS[r.type]}</span>
-            ${r.mood ? `<span style="font-size:9px;background:${light};color:${accent};padding:2px 8px;border-radius:999px;border:1px solid ${accent}44;">${r.mood}</span>` : ""}
-            <span style="font-size:9px;color:#aaa;margin-left:auto;">${idx} / ${total}</span>
-          </div>
-          <h3 style="font-size:16px;color:#3a2a32;margin:0 0 10px;font-weight:700;flex-shrink:0;">${r.date || "날짜 없음"}${r.week ? `&nbsp;·&nbsp;${r.week}` : ""}</h3>
+            <h3 style="font-size:24px;color:#3a2a32;margin:0 0 18px;font-weight:800;line-height:1.25;flex-shrink:0;">
+              ${safe(r.date || "날짜 없음")}${r.week ? `&nbsp;·&nbsp;${safe(r.week)}` : ""}
+            </h3>
 
-          <!-- 이미지 (씬 또는 사진, 동일 틀) -->
-          ${imgHtml}
+            ${image}
 
-          <!-- 텍스트 내용 -->
-          <div style="flex:1;overflow:hidden;">
-            ${field("컨디션", r.condition)}
-            ${field("병원", r.hospital)}
-            ${field("검진 내용", r.checkup)}
-            ${field("오늘의 느낌", r.feeling)}
-            ${field("아기에게 한마디", r.message, `border-left:3px solid ${accent};`)}
-            ${field("오늘의 기억", r.memory)}
-            ${field("메모", r.memo)}
+            <div style="flex:1;overflow:hidden;">
+              ${field("컨디션", r.condition, accent)}
+              ${field("병원", r.hospital, accent)}
+              ${field("검진 내용", r.checkup, accent)}
+              ${field("오늘의 느낌", r.feeling, accent)}
+              ${field("아기에게 한마디", r.message, accent, `border-left:4px solid ${accent};`)}
+              ${field("오늘의 기억", r.memory, accent)}
+              ${field("메모", r.memo, accent)}
+            </div>
           </div>
         </div>
+        <div style="position:absolute;left:0;right:0;bottom:18px;text-align:center;font-size:10px;color:#ddd;">${safe(babyName)}의 태교북 · Prenatal Story Book</div>
       </div>`;
   };
 
-  // 2개씩 묶어서 페이지 구성
-  for (let i = 0; i < records.length; i += 2) {
-    const r1 = records[i];
-    const r2 = records[i + 1] || null;
-
-    const [s1, s2] = await Promise.all([
-      svgToDataUrl(r1.id),
-      r2 ? svgToDataUrl(r2.id) : Promise.resolve(null),
-    ]);
+  for (let i = 0; i < records.length; i += 1) {
+    const r = records[i];
+    const sceneDataUrl = r.photo ? null : await svgToDataUrl(r.id);
 
     const el = document.createElement("div");
-    el.style.cssText = `
-      width:${PAGE_W}px; height:${PAGE_H}px;
-      ${baseStyle}
-      background:#faf6f9;
-      padding:${PAD}px;
-      box-sizing:border-box;
-      display:flex; flex-direction:column; gap:${GAP}px;
-    `;
-    el.innerHTML = `
-      ${makeCardHtml(r1, s1, i + 1, records.length)}
-      ${r2 ? makeCardHtml(r2, s2, i + 2, records.length) : `<div style="height:${CARD_H}px;"></div>`}
-      <div style="text-align:center;font-size:9px;color:#ddd;margin-top:auto;">${babyName}의 태교북 · Prenatal Story Book</div>
-    `;
+    el.style.cssText = `width:${PAGE_W}px;height:${PAGE_H}px;${baseStyle}`;
+    el.innerHTML = makeRecordPageHtml(r, sceneDataUrl, i + 1, records.length);
 
     const canvas = await capture(el);
     pdf.addPage();
