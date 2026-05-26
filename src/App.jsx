@@ -211,6 +211,27 @@ function usePhotoUpload(onPhoto) {
   return { ref, trigger, onChange };
 }
 
+// ── 토스트 ────────────────────────────────────────────
+function useToast() {
+  const [toasts, setToasts] = useState([]);
+  const show = (message, type = "success") => {
+    const id = uid();
+    setToasts((p) => [...p, { id, message, type }]);
+    setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 2800);
+  };
+  return { toasts, show };
+}
+function ToastLayer({ toasts }) {
+  if (!toasts.length) return null;
+  return (
+    <div style={{ position: "fixed", top: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 430, zIndex: 9999, pointerEvents: "none", padding: "max(14px,env(safe-area-inset-top)) 16px 0" }}>
+      {toasts.map((t) => (
+        <div key={t.id} className={`toast toast-${t.type}`}>{t.message}</div>
+      ))}
+    </div>
+  );
+}
+
 function BackgroundLayer({ bg, mood }) {
   const m = getMood(mood);
   const bgSrc = BACKGROUND_ASSETS[bg] || BACKGROUND_ASSETS.garden;
@@ -574,7 +595,7 @@ function IntroForm({ data, setData, setWriteTab }) {
   };
   return <div className="card pad"><h2 className="form-title">Chapter 1. 우리 아기를 기다리며</h2><p className="muted-text">{completed ? "첫 이야기는 저장되어 있어요. 필요한 부분만 수정한 뒤 완료를 눌러주세요." : "처음 접속했을 때만 기본 정보를 작성하고, 이후에는 수정용으로만 사용됩니다."}</p><label>태명<input value={b.babyName} onChange={(e) => update("babyName", e.target.value)} /></label><label>출산 예정일<input type="date" value={b.dueDate} onChange={(e) => update("dueDate", e.target.value)} /></label><div className="two"><label>엄마 이름<input value={b.motherName} onChange={(e) => update("motherName", e.target.value)} /></label><label>아빠 이름<input value={b.fatherName} onChange={(e) => update("fatherName", e.target.value)} /></label></div><label>처음 알게 된 날<input type="date" value={b.firstFoundDate} onChange={(e) => update("firstFoundDate", e.target.value)} /></label><label>처음 느낀 마음<textarea value={b.firstFeeling} onChange={(e) => update("firstFeeling", e.target.value)} /></label><label>아기에게 첫 편지<textarea value={b.firstLetter} onChange={(e) => update("firstLetter", e.target.value)} /></label><button className="primary" onClick={finishIntro}>{completed ? "수정 완료" : "첫 이야기 저장하기"}</button></div>;
 }
-function DailyForm({ setData, setTab, initialData = null, onSave }) {
+function DailyForm({ setData, setTab, initialData = null, onSave, showToast }) {
   const isEdit = Boolean(initialData);
   const [scene, setScene] = useState(
     isEdit
@@ -586,8 +607,20 @@ function DailyForm({ setData, setTab, initialData = null, onSave }) {
       ? { date: initialData.date, week: initialData.week || "", condition: initialData.condition || "", message: initialData.message || "", memory: initialData.memory || "", photo: initialData.photo || "" }
       : { date: today(), week: "", condition: "", message: "", memory: "", photo: "" }
   );
-  const update = (key, value) => setForm((p) => ({ ...p, [key]: value }));
+  const [errors, setErrors] = useState({});
+  const update = (key, value) => { setForm((p) => ({ ...p, [key]: value })); setErrors((p) => ({ ...p, [key]: "" })); };
+
+  const validate = () => {
+    const e = {};
+    if (!form.date) e.date = "날짜를 선택해주세요.";
+    if (!form.message.trim() && !form.memory.trim() && !form.condition.trim())
+      e.content = "컨디션, 아기에게 한마디, 오늘의 기억 중 하나 이상 입력해주세요.";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
   const save = () => {
+    if (!validate()) return;
     if (isEdit) {
       setData((p) => ({
         ...p,
@@ -597,9 +630,11 @@ function DailyForm({ setData, setTab, initialData = null, onSave }) {
           )
         ),
       }));
+      showToast("✅ 주차 기록이 수정되었어요!");
       onSave?.();
     } else {
       setData((p) => ({ ...p, dailyRecords: sortByDate([...p.dailyRecords, { ...form, ...scene, id: uid(), createdAt: new Date().toISOString() }]) }));
+      showToast("✨ 주차 기록이 저장되었어요!");
       setTab("book");
     }
   };
@@ -609,18 +644,28 @@ function DailyForm({ setData, setTab, initialData = null, onSave }) {
       {form.photo ? <PhotoSlot photo={form.photo} onPhoto={(v) => update("photo", v)} onRemove={() => update("photo", "")} /> : <SceneWizard scene={scene} onChange={setScene} title="오늘의 그림 수정"/>}
       <div className="photo-line"><PhotoSlot photo={form.photo} onPhoto={(v) => update("photo", v)} onRemove={() => update("photo", "")} /></div>
       <div className="two">
-        <label>날짜<input type="date" value={form.date} onChange={(e) => update("date", e.target.value)} /></label>
+        <label>날짜 <span className="required">*</span>
+          <input type="date" value={form.date} onChange={(e) => update("date", e.target.value)} className={errors.date ? "input-error" : ""} />
+          {errors.date && <span className="field-error">{errors.date}</span>}
+        </label>
         <label>임신 주차<input value={form.week} onChange={(e) => update("week", e.target.value)} placeholder="예: 18주차" /></label>
       </div>
-      <label>엄마의 컨디션<input value={form.condition} onChange={(e) => update("condition", e.target.value)} placeholder="예: 조금 피곤했지만 편안함" /></label>
-      <label>아기에게 한마디<textarea value={form.message} onChange={(e) => update("message", e.target.value)} /></label>
-      <label>오늘의 기억<textarea value={form.memory} onChange={(e) => update("memory", e.target.value)} /></label>
+      <label>엄마의 컨디션
+        <input value={form.condition} onChange={(e) => update("condition", e.target.value)} placeholder="예: 조금 피곤했지만 편안함" className={errors.content ? "input-error" : ""} />
+      </label>
+      <label>아기에게 한마디
+        <textarea value={form.message} onChange={(e) => update("message", e.target.value)} className={errors.content ? "input-error" : ""} />
+      </label>
+      <label>오늘의 기억
+        <textarea value={form.memory} onChange={(e) => update("memory", e.target.value)} className={errors.content ? "input-error" : ""} />
+        {errors.content && <span className="field-error">{errors.content}</span>}
+      </label>
       <button className="primary" onClick={save}>{isEdit ? "✅ 수정 완료" : "✨ 기록 저장하기"}</button>
       {isEdit && <button className="ghost full" style={{marginTop:8}} onClick={() => onSave?.()}>취소</button>}
     </div>
   );
 }
-function ActivityForm({ setData, setTab, initialData = null, onSave }) {
+function ActivityForm({ setData, setTab, initialData = null, onSave, showToast }) {
   const isEdit = Boolean(initialData);
   const [scene, setScene] = useState(
     isEdit
@@ -632,8 +677,20 @@ function ActivityForm({ setData, setTab, initialData = null, onSave }) {
       ? { date: initialData.date, withWhom: initialData.withWhom || "", feeling: initialData.feeling || "", message: initialData.message || "", photo: initialData.photo || "" }
       : { date: today(), withWhom: "", feeling: "", message: "", photo: "" }
   );
-  const update = (key, value) => setForm((p) => ({ ...p, [key]: value }));
+  const [errors, setErrors] = useState({});
+  const update = (key, value) => { setForm((p) => ({ ...p, [key]: value })); setErrors((p) => ({ ...p, [key]: "" })); };
+
+  const validate = () => {
+    const e = {};
+    if (!form.date) e.date = "날짜를 선택해주세요.";
+    if (!form.feeling.trim() && !form.message.trim())
+      e.content = "오늘의 느낌 또는 아기에게 남기는 말을 입력해주세요.";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
   const save = () => {
+    if (!validate()) return;
     if (isEdit) {
       setData((p) => ({
         ...p,
@@ -643,9 +700,11 @@ function ActivityForm({ setData, setTab, initialData = null, onSave }) {
           )
         ),
       }));
+      showToast("✅ 태교 활동이 수정되었어요!");
       onSave?.();
     } else {
       setData((p) => ({ ...p, activityRecords: sortByDate([...p.activityRecords, { ...form, ...scene, id: uid(), createdAt: new Date().toISOString() }]) }));
+      showToast("🌿 태교 활동이 저장되었어요!");
       setTab("book");
     }
   };
@@ -654,16 +713,24 @@ function ActivityForm({ setData, setTab, initialData = null, onSave }) {
       <h2 className="form-title">{isEdit ? "✏️ 태교 활동 수정" : "Chapter 3. 태교 활동 기록"}</h2>
       {form.photo ? <PhotoSlot photo={form.photo} onPhoto={(v) => update("photo", v)} onRemove={() => update("photo", "")} /> : <SceneWizard scene={scene} onChange={setScene} title="활동 그림 수정"/>}
       <div className="photo-line"><PhotoSlot photo={form.photo} onPhoto={(v) => update("photo", v)} onRemove={() => update("photo", "")} /></div>
-      <label>날짜<input type="date" value={form.date} onChange={(e) => update("date", e.target.value)} /></label>
+      <label>날짜 <span className="required">*</span>
+        <input type="date" value={form.date} onChange={(e) => update("date", e.target.value)} className={errors.date ? "input-error" : ""} />
+        {errors.date && <span className="field-error">{errors.date}</span>}
+      </label>
       <label>함께한 사람<input value={form.withWhom} onChange={(e) => update("withWhom", e.target.value)} placeholder="예: 아빠와 함께" /></label>
-      <label>오늘의 느낌<textarea value={form.feeling} onChange={(e) => update("feeling", e.target.value)} /></label>
-      <label>아기에게 남기는 말<textarea value={form.message} onChange={(e) => update("message", e.target.value)} /></label>
+      <label>오늘의 느낌
+        <textarea value={form.feeling} onChange={(e) => update("feeling", e.target.value)} className={errors.content ? "input-error" : ""} />
+      </label>
+      <label>아기에게 남기는 말
+        <textarea value={form.message} onChange={(e) => update("message", e.target.value)} className={errors.content ? "input-error" : ""} />
+        {errors.content && <span className="field-error">{errors.content}</span>}
+      </label>
       <button className="primary" onClick={save}>{isEdit ? "✅ 수정 완료" : "✨ 태교 활동 저장하기"}</button>
       {isEdit && <button className="ghost full" style={{marginTop:8}} onClick={() => onSave?.()}>취소</button>}
     </div>
   );
 }
-function HospitalForm({ setData, setTab, initialData = null, onSave }) {
+function HospitalForm({ setData, setTab, initialData = null, onSave, showToast }) {
   const isEdit = Boolean(initialData);
   const [scene, setScene] = useState(
     isEdit
@@ -675,8 +742,20 @@ function HospitalForm({ setData, setTab, initialData = null, onSave }) {
       ? { date: initialData.date, week: initialData.week || "", hospital: initialData.hospital || "", checkup: initialData.checkup || "", memo: initialData.memo || "", condition: initialData.condition || "", nextDate: initialData.nextDate || "", photo: initialData.photo || "" }
       : { date: today(), week: "", hospital: "", checkup: "", memo: "", condition: "", nextDate: "", photo: "" }
   );
-  const update = (key, value) => setForm((p) => ({ ...p, [key]: value }));
+  const [errors, setErrors] = useState({});
+  const update = (key, value) => { setForm((p) => ({ ...p, [key]: value })); setErrors((p) => ({ ...p, [key]: "" })); };
+
+  const validate = () => {
+    const e = {};
+    if (!form.date) e.date = "날짜를 선택해주세요.";
+    if (!form.hospital.trim() && !form.checkup.trim() && !form.memo.trim())
+      e.content = "병원명, 검진 내용, 메모 중 하나 이상 입력해주세요.";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
   const save = () => {
+    if (!validate()) return;
     if (isEdit) {
       setData((p) => ({
         ...p,
@@ -686,9 +765,11 @@ function HospitalForm({ setData, setTab, initialData = null, onSave }) {
           )
         ),
       }));
+      showToast("✅ 병원 기록이 수정되었어요!");
       onSave?.();
     } else {
       setData((p) => ({ ...p, hospitalRecords: sortByDate([...p.hospitalRecords, { ...form, ...scene, id: uid(), createdAt: new Date().toISOString() }]) }));
+      showToast("🏥 병원 기록이 저장되었어요!");
       setTab("book");
     }
   };
@@ -698,14 +779,24 @@ function HospitalForm({ setData, setTab, initialData = null, onSave }) {
       {form.photo ? <PhotoSlot photo={form.photo} onPhoto={(v) => update("photo", v)} onRemove={() => update("photo", "")} /> : <SceneWizard scene={scene} onChange={setScene} title="병원 기록 그림 수정"/>}
       <div className="photo-line"><PhotoSlot photo={form.photo} onPhoto={(v) => update("photo", v)} onRemove={() => update("photo", "")} /></div>
       <div className="two">
-        <label>날짜<input type="date" value={form.date} onChange={(e) => update("date", e.target.value)} /></label>
+        <label>날짜 <span className="required">*</span>
+          <input type="date" value={form.date} onChange={(e) => update("date", e.target.value)} className={errors.date ? "input-error" : ""} />
+          {errors.date && <span className="field-error">{errors.date}</span>}
+        </label>
         <label>임신 주차<input value={form.week} onChange={(e) => update("week", e.target.value)} /></label>
       </div>
-      <label>병원명<input value={form.hospital} onChange={(e) => update("hospital", e.target.value)} /></label>
-      <label>검진 내용<input value={form.checkup} onChange={(e) => update("checkup", e.target.value)} placeholder="예: 정기검진, 초음파" /></label>
+      <label>병원명
+        <input value={form.hospital} onChange={(e) => update("hospital", e.target.value)} className={errors.content ? "input-error" : ""} />
+      </label>
+      <label>검진 내용
+        <input value={form.checkup} onChange={(e) => update("checkup", e.target.value)} placeholder="예: 정기검진, 초음파" className={errors.content ? "input-error" : ""} />
+      </label>
       <label>컨디션<input value={form.condition} onChange={(e) => update("condition", e.target.value)} /></label>
       <label>다음 진료일<input type="date" value={form.nextDate} onChange={(e) => update("nextDate", e.target.value)} /></label>
-      <label>메모<textarea value={form.memo} onChange={(e) => update("memo", e.target.value)} /></label>
+      <label>메모
+        <textarea value={form.memo} onChange={(e) => update("memo", e.target.value)} className={errors.content ? "input-error" : ""} />
+        {errors.content && <span className="field-error">{errors.content}</span>}
+      </label>
       <button className="primary" onClick={save}>{isEdit ? "✅ 수정 완료" : "🏥 병원 기록 저장하기"}</button>
       {isEdit && <button className="ghost full" style={{marginTop:8}} onClick={() => onSave?.()}>취소</button>}
     </div>
@@ -805,7 +896,7 @@ function RecordCategoryChooser({ setWriteTab }) {
   );
 }
 
-function Write({ data, setData, writeTab, setWriteTab, setTab, editTarget, setEditTarget }) {
+function Write({ data, setData, writeTab, setWriteTab, setTab, editTarget, setEditTarget, showToast }) {
   const introDone = isIntroWritten(data.babyInfo);
   const [showIntroPrompt, setShowIntroPrompt] = useState(!introDone);
 
@@ -843,6 +934,7 @@ function Write({ data, setData, writeTab, setWriteTab, setTab, editTarget, setEd
           setTab={setTab}
           initialData={editTarget?.type === "daily" ? editTarget : null}
           onSave={editTarget?.type === "daily" ? handleEditSave : undefined}
+          showToast={showToast}
         />
       )}
       {safeWriteTab === "activity" && (
@@ -851,6 +943,7 @@ function Write({ data, setData, writeTab, setWriteTab, setTab, editTarget, setEd
           setTab={setTab}
           initialData={editTarget?.type === "activity" ? editTarget : null}
           onSave={editTarget?.type === "activity" ? handleEditSave : undefined}
+          showToast={showToast}
         />
       )}
       {safeWriteTab === "hospital" && (
@@ -859,6 +952,7 @@ function Write({ data, setData, writeTab, setWriteTab, setTab, editTarget, setEd
           setTab={setTab}
           initialData={editTarget?.type === "hospital" ? editTarget : null}
           onSave={editTarget?.type === "hospital" ? handleEditSave : undefined}
+          showToast={showToast}
         />
       )}
       {safeWriteTab === "prepare" && <PrepareForm data={data} setData={setData}/>}
@@ -1392,6 +1486,7 @@ export default function App() {
   const [tab, setTab] = useState("home");
   const [writeTab, setWriteTab] = useState(() => isIntroWritten(data.babyInfo) ? "choose" : "intro");
   const [editTarget, setEditTarget] = useState(null);
+  const { toasts, show: showToast } = useToast();
 
   useEffect(() => {
     if (writeTab === "intro" && isIntroWritten(data.babyInfo)) setWriteTab("choose");
@@ -1403,10 +1498,9 @@ export default function App() {
     setTab("write");
   };
 
-  // 태교북 카드의 수정 버튼 클릭 → write 탭의 해당 폼으로 이동
   const handleEdit = (record) => {
     setEditTarget(record);
-    setWriteTab(record.type); // "daily" | "activity" | "hospital"
+    setWriteTab(record.type);
     setTab("write");
   };
 
@@ -1415,6 +1509,7 @@ export default function App() {
   return (
     <div className="app-shell" style={bgStyle}>
       <div className="ambient"/>
+      <ToastLayer toasts={toasts} />
       <BabyNamePopup data={data} setData={setData}/>
       <div className="app">
         <Header data={data}/>
@@ -1428,6 +1523,7 @@ export default function App() {
             setTab={setTab}
             editTarget={editTarget}
             setEditTarget={setEditTarget}
+            showToast={showToast}
           />
         )}
         {tab === "book" && <Book data={data} setData={setData} onEdit={handleEdit}/>}
