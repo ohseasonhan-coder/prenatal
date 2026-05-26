@@ -1026,13 +1026,14 @@ async function exportPDF(data) {
   };
 
   // A4 한 장에 기록 1개를 넣습니다.
-  // 이전처럼 한 페이지에 2개를 넣으면 이미지 박스가 낮아져서 위아래로 눌려 보입니다.
+  // 일러스트와 업로드 사진 모두 420:260 프레임으로 출력합니다.
+  // 사진은 프레임 안에서 원본 비율을 유지하므로 잘리거나 눌리지 않습니다.
   const PAD = 38;
   const CARD_W = PAGE_W - PAD * 2;
   const CARD_H = PAGE_H - PAD * 2 - 24;
   const INNER_W = CARD_W - 56;
   const SCENE_H = Math.round(INNER_W * 260 / 420); // SceneComposer 원본 비율 420:260 유지
-  const PHOTO_MAX_H = 560; // 업로드 사진은 이 박스 안에서 원본 비율 유지
+  const IMAGE_FRAME_H = SCENE_H; // 사진도 일러스트와 같은 420:260 프레임 유지
 
   const field = (label, val, accent, extra = "") => val ? `
     <div style="margin-bottom:12px;">
@@ -1062,7 +1063,7 @@ async function exportPDF(data) {
       return `
         <div style="
           width:${INNER_W}px;
-          height:${PHOTO_MAX_H}px;
+          height:${IMAGE_FRAME_H}px;
           margin:0 0 20px;
           flex-shrink:0;
           border-radius:16px;
@@ -1073,7 +1074,7 @@ async function exportPDF(data) {
           display:flex;
           align-items:center;
           justify-content:center;
-          padding:12px;
+          padding:10px;
         ">
           <img
             src="${r.photo}"
