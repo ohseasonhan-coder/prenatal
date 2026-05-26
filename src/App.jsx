@@ -1182,20 +1182,16 @@ function Write({ data, setData, writeTab, setWriteTab, setTab, editTarget, setEd
   );
 }
 function Book({ data, setData, onEdit, showToast }) {
-  // 소프트 삭제: 숨긴 id 집합
   const [hiddenIds, setHiddenIds] = useState(new Set());
+  const [query, setQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all"); // "all" | "daily" | "activity" | "hospital"
 
   const removeRecord = (key, r) => {
-    // 즉시 화면에서 숨김
     setHiddenIds((p) => new Set([...p, r.id]));
-
-    // 4초 후 실제 삭제 예약
     const timer = setTimeout(() => {
       setData((p) => ({ ...p, [key]: p[key].filter((item) => item.id !== r.id) }));
       setHiddenIds((p) => { const next = new Set(p); next.delete(r.id); return next; });
     }, 4000);
-
-    // 토스트 + 언두
     showToast(
       "기록을 삭제했어요.",
       "success",
@@ -1213,7 +1209,25 @@ function Book({ data, setData, onEdit, showToast }) {
     ...data.hospitalRecords.map((r) => ({ ...r, type: "hospital" })),
   ].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
-  const visible = records.filter((r) => !hiddenIds.has(r.id));
+  // 소프트 삭제 제거 → 유형 필터 → 텍스트 검색
+  const q = query.trim().toLowerCase();
+  const filtered = records
+    .filter((r) => !hiddenIds.has(r.id))
+    .filter((r) => typeFilter === "all" || r.type === typeFilter)
+    .filter((r) => {
+      if (!q) return true;
+      return [r.date, r.week, r.condition, r.message, r.memory, r.feeling, r.memo, r.hospital, r.checkup, r.withWhom]
+        .some((v) => v && v.toLowerCase().includes(q));
+    });
+
+  const TYPE_CHIPS = [
+    { id: "all",      label: "전체" },
+    { id: "daily",    label: "주차기록" },
+    { id: "activity", label: "태교활동" },
+    { id: "hospital", label: "병원기록" },
+  ];
+
+  const hasRecords = records.length > 0;
 
   return (
     <main className="screen">
@@ -1224,9 +1238,49 @@ function Book({ data, setData, onEdit, showToast }) {
           <p>{data.babyInfo.dueDate ? `출산 예정일 ${fmtDate(data.babyInfo.dueDate)}` : "출산 예정일을 입력해보세요."}</p>
         </div>
       </section>
-      {visible.length === 0 ? (
+
+      {/* 검색 + 필터 — 기록이 1개 이상일 때만 표시 */}
+      {hasRecords && (
+        <div className="book-filter card pad">
+          <div className="book-search-wrap">
+            <span className="book-search-icon" aria-hidden="true">🔍</span>
+            <input
+              className="book-search"
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="날짜, 내용, 병원명으로 검색"
+              aria-label="기록 검색"
+            />
+            {query && (
+              <button className="book-search-clear" type="button" onClick={() => setQuery("")} aria-label="검색어 지우기">×</button>
+            )}
+          </div>
+          <div className="book-chips" role="group" aria-label="기록 유형 필터">
+            {TYPE_CHIPS.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className={`book-chip${typeFilter === c.id ? " on" : ""}`}
+                onClick={() => setTypeFilter(c.id)}
+                aria-pressed={typeFilter === c.id}
+              >{c.label}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!hasRecords ? (
         <div className="empty card">아직 저장된 기록이 없어요.<br/>오늘의 태교 장면을 먼저 기록해보세요.</div>
-      ) : visible.map((r) => {
+      ) : filtered.length === 0 ? (
+        <div className="empty card">
+          {q ? `"${q}"에 해당하는 기록이 없어요.` : "해당 유형의 기록이 없어요."}
+          <br/>
+          <button type="button" className="ghost" style={{marginTop:12,fontSize:13}} onClick={() => { setQuery(""); setTypeFilter("all"); }}>
+            필터 초기화
+          </button>
+        </div>
+      ) : filtered.map((r) => {
         const key = r.type === "daily" ? "dailyRecords" : r.type === "activity" ? "activityRecords" : "hospitalRecords";
         return (
           <article className="record card" key={`${r.type}-${r.id}`} id={`record-${r.id}`}>
@@ -1236,26 +1290,10 @@ function Book({ data, setData, onEdit, showToast }) {
                 <p>{fmtDate(r.date)} {r.week ? `· ${r.week}` : ""}{r.updatedAt ? " · 수정됨" : ""}</p>
               </div>
               <div style={{display:"flex",gap:"6px",alignItems:"center",flexWrap:"wrap",justifyContent:"flex-end"}}>
-                <button
-                  onClick={() => onEdit(r)}
-                  style={{background:"rgba(255,255,255,.8)",border:"1px solid rgba(164,122,142,.18)",borderRadius:"13px",cursor:"pointer",fontSize:"13px",padding:"6px 10px",fontWeight:"800",color:"#8b707c"}}
-                  aria-label="기록 수정하기"
-                >✏️ 수정</button>
-                <button
-                  onClick={async () => { const el = document.getElementById(`record-${r.id}`); const canvas = await captureElement(el); await shareImage(canvas, `태교기록_${r.date}.png`); }}
-                  style={{background:"rgba(255,255,255,.8)",border:"1px solid rgba(164,122,142,.18)",borderRadius:"13px",cursor:"pointer",fontSize:"13px",padding:"6px 10px",fontWeight:"800",color:"#8b707c"}}
-                  aria-label="카드 이미지 공유하기"
-                >📤 공유</button>
-                <button
-                  onClick={async () => { await shareStoryCard(r, data.babyInfo.babyName); }}
-                  style={{background:"linear-gradient(135deg,#f27ea5,#a78bfa)",border:"none",borderRadius:"13px",cursor:"pointer",fontSize:"13px",padding:"6px 10px",fontWeight:"800",color:"#fff"}}
-                  aria-label="인스타그램 스토리용 이미지 만들기"
-                >📸 스토리</button>
-                <button
-                  onClick={() => removeRecord(key, r)}
-                  style={{background:"rgba(255,255,255,.7)",border:"1px solid rgba(164,122,142,.18)",borderRadius:"13px",padding:"7px 10px",fontSize:"12px",fontWeight:"800",color:"#8b707c"}}
-                  aria-label="기록 삭제하기"
-                >삭제</button>
+                <button onClick={() => onEdit(r)} style={{background:"rgba(255,255,255,.8)",border:"1px solid rgba(164,122,142,.18)",borderRadius:"13px",cursor:"pointer",fontSize:"13px",padding:"6px 10px",fontWeight:"800",color:"#8b707c"}} aria-label="기록 수정하기">✏️ 수정</button>
+                <button onClick={async () => { const el = document.getElementById(`record-${r.id}`); const canvas = await captureElement(el); await shareImage(canvas, `태교기록_${r.date}.png`); }} style={{background:"rgba(255,255,255,.8)",border:"1px solid rgba(164,122,142,.18)",borderRadius:"13px",cursor:"pointer",fontSize:"13px",padding:"6px 10px",fontWeight:"800",color:"#8b707c"}} aria-label="카드 이미지 공유하기">📤 공유</button>
+                <button onClick={async () => { await shareStoryCard(r, data.babyInfo.babyName); }} style={{background:"linear-gradient(135deg,#f27ea5,#a78bfa)",border:"none",borderRadius:"13px",cursor:"pointer",fontSize:"13px",padding:"6px 10px",fontWeight:"800",color:"#fff"}} aria-label="인스타그램 스토리용 이미지 만들기">📸 스토리</button>
+                <button onClick={() => removeRecord(key, r)} style={{background:"rgba(255,255,255,.7)",border:"1px solid rgba(164,122,142,.18)",borderRadius:"13px",padding:"7px 10px",fontSize:"12px",fontWeight:"800",color:"#8b707c"}} aria-label="기록 삭제하기">삭제</button>
               </div>
             </div>
             {r.photo
