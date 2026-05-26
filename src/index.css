@@ -19,6 +19,19 @@
 .summary-tag:active{transform:scale(.96);}
 .wizard-actions-prev-only{grid-template-columns:1fr;}
 
+/* 태교북 검색 + 필터 */
+.book-filter{margin-bottom:14px;display:flex;flex-direction:column;gap:10px;}
+.book-search-wrap{position:relative;display:flex;align-items:center;}
+.book-search-icon{position:absolute;left:14px;font-size:15px;pointer-events:none;}
+.book-search{width:100%;padding:11px 36px 11px 38px;border-radius:18px;border:1.5px solid rgba(164,122,142,.18);background:rgba(255,255,255,.82);font-size:14px;color:#3f3138;outline:0;}
+.book-search:focus{border-color:var(--accent);}
+.book-search-clear{position:absolute;right:12px;width:22px;height:22px;border-radius:50%;background:rgba(164,122,142,.18);color:#8b707c;font-size:14px;display:grid;place-items:center;line-height:1;}
+.book-chips{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;}
+.book-chips::-webkit-scrollbar{display:none;}
+.book-chip{flex:0 0 auto;padding:7px 14px;border-radius:999px;font-size:12px;font-weight:900;color:#8b707c;background:rgba(255,255,255,.72);border:1.5px solid rgba(164,122,142,.14);transition:transform .1s;}
+.book-chip.on{background:#fff;color:var(--deep);border-color:color-mix(in srgb,var(--accent) 40%,white);box-shadow:0 4px 14px rgba(99,64,80,.1);}
+.book-chip:active{transform:scale(.96);}
+
 /* 토스트 */
 @keyframes toastIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
 @keyframes toastOut{from{opacity:1}to{opacity:0}}
