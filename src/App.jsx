@@ -510,7 +510,28 @@ function SceneComposer({ mood = "사랑", bg = "garden", character = "family", a
     catch(err) { console.error(err); }
     finally { setSharing(false); }
   };
-  return <div className={`scene ${small ? "scene-small" : ""} ${large ? "scene-large" : ""}`} ref={sceneRef}><svg viewBox="0 0 420 260" role="img" aria-label="태교 일러스트"><defs><linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={m.sky[0]}/><stop offset="100%" stopColor={m.sky[1]}/></linearGradient></defs><g><rect width="420" height="260" fill={`url(#${gradId})`}/><BackgroundLayer bg={bg} mood={mood}/><path d="M210 70 C255 10 358 40 360 116 C362 185 286 214 210 235 C134 214 58 185 60 116 C62 40 165 10 210 70 Z" fill={m.accent} opacity=".42"/><LeafDecor mood={mood}/><MoodFx mood={mood}/><FamilyIllustration character={character} mood={mood}/><ActivityLayer activity={activity} mood={mood} character={character}/></g></svg>{editable && <button className="edit-float" type="button" onClick={onEdit} aria-label="그림 수정">✏️</button>}{!small && <button className="share-float" type="button" onClick={handleShare} disabled={sharing} aria-label="공유">{sharing ? "⏳" : "📤"}</button>}</div>;
+  const bgLabel  = BACKGROUNDS.find(b => b.id === bg)?.label || bg;
+  const charLabel = CHARACTERS.find(c => c.id === character)?.label || character;
+  const actLabel  = getActivity(activity).label;
+  const svgAriaLabel = `태교 일러스트 — 기분: ${mood}, 배경: ${bgLabel}, 인물: ${charLabel}, 활동: ${actLabel}`;
+  return (
+    <div className={`scene ${small ? "scene-small" : ""} ${large ? "scene-large" : ""}`} ref={sceneRef}>
+      <svg viewBox="0 0 420 260" role="img" aria-label={svgAriaLabel}>
+        <defs><linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={m.sky[0]}/><stop offset="100%" stopColor={m.sky[1]}/></linearGradient></defs>
+        <g>
+          <rect width="420" height="260" fill={`url(#${gradId})`}/>
+          <BackgroundLayer bg={bg} mood={mood}/>
+          <path d="M210 70 C255 10 358 40 360 116 C362 185 286 214 210 235 C134 214 58 185 60 116 C62 40 165 10 210 70 Z" fill={m.accent} opacity=".42"/>
+          <LeafDecor mood={mood}/>
+          <MoodFx mood={mood}/>
+          <FamilyIllustration character={character} mood={mood}/>
+          <ActivityLayer activity={activity} mood={mood} character={character}/>
+        </g>
+      </svg>
+      {editable && <button className="edit-float" type="button" onClick={onEdit} aria-label="그림 수정하기">✏️</button>}
+      {!small && <button className="share-float" type="button" onClick={handleShare} disabled={sharing} aria-label={sharing ? "공유 중" : "이미지 공유하기"}>{sharing ? "⏳" : "📤"}</button>}
+    </div>
+  );
 }
 function PhotoSlot({ photo, onPhoto, onRemove, small = false, onPhotoError }) {
   const [photoErr, setPhotoErr] = useState("");
@@ -529,6 +550,9 @@ function PhotoSlot({ photo, onPhoto, onRemove, small = false, onPhotoError }) {
 function SceneWizard({ scene, onChange, title = "그림 만들기" }) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
+  const dialogRef = useRef(null);
+  const headingId = useMemo(() => `wizard-title-${uid().slice(0,8)}`, []);
+
   const steps = [
     { key: "mood", title: "기분을 선택해요", sub: "오늘의 감정 색이 전체 그림에 반영됩니다.", list: MOODS },
     { key: "bg", title: "배경을 선택해요", sub: "기록에 어울리는 장소를 골라주세요.", list: BACKGROUNDS },
@@ -536,11 +560,38 @@ function SceneWizard({ scene, onChange, title = "그림 만들기" }) {
     { key: "activity", title: "태교 활동을 선택해요", sub: "오늘의 활동을 그림에 넣어요.", list: ACTIVITIES }
   ];
   const current = steps[step];
+
+  // 팝업 열릴 때 첫 번째 포커스 가능 요소로 이동
+  useEffect(() => {
+    if (!open) return;
+    const first = dialogRef.current?.querySelector("button, [tabindex='0']");
+    first?.focus();
+  }, [open]);
+
+  // Escape 닫기 + 포커스 트랩
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") { setOpen(false); return; }
+      if (e.key !== "Tab") return;
+      const focusable = [...dialogRef.current?.querySelectorAll(
+        "button:not([disabled]), [tabindex='0']"
+      ) || []];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
   const select = (id) => {
     onChange({ ...scene, [current.key]: id });
-
-    // 선택 즉시 다음 단계로 이동합니다.
-    // 마지막 단계인 활동 선택까지 끝나면 팝업을 닫습니다.
     if (step < steps.length - 1) {
       setStep((v) => Math.min(steps.length - 1, v + 1));
     } else {
@@ -555,13 +606,91 @@ function SceneWizard({ scene, onChange, title = "그림 만들기" }) {
     { emoji: CHARACTERS.find(c => c.id === scene.character)?.emoji, label: CHARACTERS.find(c => c.id === scene.character)?.label, stepIndex: 2 },
     { emoji: getActivity(scene.activity).emoji, label: getActivity(scene.activity).label, stepIndex: 3 },
   ];
-  return <div className="scene-editor"><SceneComposer {...scene} large editable onEdit={reset}/><div className="selected-summary">{summaryItems.map(({ emoji, label, stepIndex }) => <button type="button" key={stepIndex} className="summary-tag" onClick={() => openAt(stepIndex)}><span>{emoji}</span>{label}</button>)}</div>{open && <div className="wizard-backdrop"><section className="wizard"><div className="wizard-head"><div><strong>{title}</strong><p>{step + 1} / {steps.length}</p></div><button type="button" onClick={() => setOpen(false)}>×</button></div><div className="progress"><span style={{ width: `${((step + 1) / steps.length) * 100}%` }} /></div><h3>{current.title}</h3><p className="muted-text">{current.sub}</p><div className="choice-grid">{current.list.map((item) => <button type="button" key={item.id} className={scene[current.key] === item.id ? "choice on" : "choice"} onClick={() => select(item.id)}><span>{item.emoji}</span>{item.label}</button>)}</div><div className="wizard-actions wizard-actions-prev-only"><button type="button" className="ghost" disabled={step === 0} onClick={() => setStep((v) => Math.max(0, v - 1))}>이전</button></div></section></div>}</div>;
+  return (
+    <div className="scene-editor">
+      <SceneComposer {...scene} large editable onEdit={reset}/>
+      <div className="selected-summary" role="group" aria-label="현재 그림 설정">
+        {summaryItems.map(({ emoji, label, stepIndex }) => (
+          <button type="button" key={stepIndex} className="summary-tag" onClick={() => openAt(stepIndex)} aria-label={`${label} 변경하기`}>
+            <span aria-hidden="true">{emoji}</span>{label}
+          </button>
+        ))}
+      </div>
+      {open && (
+        <div
+          className="wizard-backdrop"
+          onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
+        >
+          <section
+            ref={dialogRef}
+            className="wizard"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={headingId}
+          >
+            <div className="wizard-head">
+              <div>
+                <strong id={headingId}>{title}</strong>
+                <p>{step + 1} / {steps.length}</p>
+              </div>
+              <button type="button" onClick={() => setOpen(false)} aria-label="닫기">×</button>
+            </div>
+            <div className="progress" role="progressbar" aria-valuenow={step + 1} aria-valuemin={1} aria-valuemax={steps.length} aria-label={`${step + 1}단계 / ${steps.length}단계`}>
+              <span style={{ width: `${((step + 1) / steps.length) * 100}%` }} />
+            </div>
+            <h3>{current.title}</h3>
+            <p className="muted-text">{current.sub}</p>
+            <div className="choice-grid" role="listbox" aria-label={current.title}>
+              {current.list.map((item) => (
+                <button
+                  type="button"
+                  key={item.id}
+                  role="option"
+                  aria-selected={scene[current.key] === item.id}
+                  className={scene[current.key] === item.id ? "choice on" : "choice"}
+                  onClick={() => select(item.id)}
+                >
+                  <span aria-hidden="true">{item.emoji}</span>{item.label}
+                </button>
+              ))}
+            </div>
+            <div className="wizard-actions wizard-actions-prev-only">
+              <button type="button" className="ghost" disabled={step === 0} onClick={() => setStep((v) => Math.max(0, v - 1))} aria-label="이전 단계">이전</button>
+            </div>
+          </section>
+        </div>
+      )}
+    </div>
+  );
 }
 
 
 function BabyNamePopup({ data, setData }) {
   const shouldOpen = !data.babyInfo?.babyNamePromptDone;
   const [name, setName] = useState(data.babyInfo?.babyName || "");
+  const dialogRef = useRef(null);
+  const headingId = "baby-name-popup-title";
+
+  useEffect(() => {
+    if (!shouldOpen) return;
+    dialogRef.current?.querySelector("input")?.focus();
+  }, [shouldOpen]);
+
+  useEffect(() => {
+    if (!shouldOpen) return;
+    const onKey = (e) => {
+      if (e.key !== "Tab") return;
+      const focusable = [...dialogRef.current?.querySelectorAll(
+        "input, button:not([disabled])"
+      ) || []];
+      if (!focusable.length) return;
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey) { if (document.activeElement === first) { e.preventDefault(); last.focus(); } }
+      else { if (document.activeElement === last) { e.preventDefault(); first.focus(); } }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [shouldOpen]);
 
   if (!shouldOpen) return null;
 
@@ -578,77 +707,47 @@ function BabyNamePopup({ data, setData }) {
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 18,
-        background: "rgba(28, 22, 42, .42)",
-        backdropFilter: "blur(8px)"
-      }}
+      style={{ position:"fixed", inset:0, zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:18, background:"rgba(28,22,42,.42)", backdropFilter:"blur(8px)" }}
+      aria-hidden="false"
     >
       <section
-        style={{
-          width: "min(92vw, 380px)",
-          borderRadius: 28,
-          padding: "26px 22px 22px",
-          background: "rgba(255, 255, 255, .96)",
-          boxShadow: "0 24px 70px rgba(60, 39, 78, .24)",
-          border: "1px solid rgba(255,255,255,.7)",
-          textAlign: "center"
-        }}
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={headingId}
+        style={{ width:"min(92vw, 380px)", borderRadius:28, padding:"26px 22px 22px", background:"rgba(255,255,255,.96)", boxShadow:"0 24px 70px rgba(60,39,78,.24)", border:"1px solid rgba(255,255,255,.7)", textAlign:"center" }}
       >
-        <div style={{ fontSize: 36, marginBottom: 8 }}>👶</div>
-        <h2 style={{ margin: "0 0 8px", fontSize: 22, color: "#3f3344" }}>아기의 태명을 알려주세요</h2>
-        <p style={{ margin: "0 0 18px", fontSize: 14, lineHeight: 1.55, color: "#7b7080" }}>
+        <div style={{ fontSize:36, marginBottom:8 }} aria-hidden="true">👶</div>
+        <h2 id={headingId} style={{ margin:"0 0 8px", fontSize:22, color:"#3f3344" }}>아기의 태명을 알려주세요</h2>
+        <p style={{ margin:"0 0 18px", fontSize:14, lineHeight:1.55, color:"#7b7080" }}>
           입력한 태명은 홈 화면과 태교북 제목에 사용돼요. 나중에 Chapter 1에서 다시 수정할 수 있어요.
         </p>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="예: 콩콩이, 찰떡이"
-          autoFocus
-          style={{
-            width: "100%",
-            boxSizing: "border-box",
-            border: "1px solid #eadfea",
-            borderRadius: 18,
-            padding: "15px 16px",
-            fontSize: 16,
-            outline: "none",
-            textAlign: "center",
-            background: "#fffafd",
-            color: "#3f3344"
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") close(name);
-          }}
+          aria-label="아기 태명 입력"
+          style={{ width:"100%", boxSizing:"border-box", border:"1px solid #eadfea", borderRadius:18, padding:"15px 16px", fontSize:16, outline:"none", textAlign:"center", background:"#fffafd", color:"#3f3344" }}
+          onKeyDown={(e) => { if (e.key === "Enter") close(name); }}
         />
-        <button
-          type="button"
-          className="primary"
-          style={{ width: "100%", marginTop: 14 }}
-          onClick={() => close(name)}
-        >
-          태명 저장하기
-        </button>
-        <button
-          type="button"
-          className="ghost"
-          style={{ width: "100%", marginTop: 8 }}
-          onClick={() => close("")}
-        >
-          나중에 정할게요
-        </button>
+        <button type="button" className="primary" style={{ width:"100%", marginTop:14 }} onClick={() => close(name)}>태명 저장하기</button>
+        <button type="button" className="ghost" style={{ width:"100%", marginTop:8 }} onClick={() => close("")}>나중에 정할게요</button>
       </section>
     </div>
   );
 }
 
-function Header({ data }) { return <header className="topbar"><div><p>Mobile Taegyo Book</p><h1>{data.babyInfo.babyName || "우리 아기"}의 태교북</h1></div><span>{getMood(data.babyInfo.coverMood).emoji}</span></header>; }
+function Header({ data }) {
+  return (
+    <header className="topbar" role="banner">
+      <div>
+        <p>Mobile Taegyo Book</p>
+        <h1>{data.babyInfo.babyName || "우리 아기"}의 태교북</h1>
+      </div>
+      <span aria-hidden="true">{getMood(data.babyInfo.coverMood).emoji}</span>
+    </header>
+  );
+}
 function Home({ data, setData, setTab, setWriteTab }) {
   const b = data.babyInfo;
   const updateCover = (scene) => setData((p) => ({ ...p, babyInfo: { ...p.babyInfo, coverMood: scene.mood, coverBg: scene.bg, coverChar: scene.character, coverActivity: scene.activity } }));
@@ -883,58 +982,43 @@ function PrepareForm({ data, setData }) {
 }
 
 function IntroStartPopup({ setWriteTab, setTab, onClose }) {
+  const dialogRef = useRef(null);
+  const headingId = "intro-popup-title";
+
+  useEffect(() => {
+    dialogRef.current?.querySelector("button")?.focus();
+    const onKey = (e) => {
+      if (e.key === "Escape") { onClose(); setTab("home"); return; }
+      if (e.key !== "Tab") return;
+      const focusable = [...dialogRef.current?.querySelectorAll("button:not([disabled])") || []];
+      if (!focusable.length) return;
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey) { if (document.activeElement === first) { e.preventDefault(); last.focus(); } }
+      else { if (document.activeElement === last) { e.preventDefault(); first.focus(); } }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9998,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 18,
-        background: "rgba(28, 22, 42, .38)",
-        backdropFilter: "blur(8px)"
-      }}
+      style={{ position:"fixed", inset:0, zIndex:9998, display:"flex", alignItems:"center", justifyContent:"center", padding:18, background:"rgba(28,22,42,.38)", backdropFilter:"blur(8px)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) { onClose(); setTab("home"); } }}
     >
       <section
-        style={{
-          width: "min(92vw, 390px)",
-          borderRadius: 28,
-          padding: "26px 22px 22px",
-          background: "rgba(255, 255, 255, .97)",
-          boxShadow: "0 24px 70px rgba(60, 39, 78, .24)",
-          border: "1px solid rgba(255,255,255,.7)",
-          textAlign: "center"
-        }}
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={headingId}
+        style={{ width:"min(92vw, 390px)", borderRadius:28, padding:"26px 22px 22px", background:"rgba(255,255,255,.97)", boxShadow:"0 24px 70px rgba(60,39,78,.24)", border:"1px solid rgba(255,255,255,.7)", textAlign:"center" }}
       >
-        <div style={{ fontSize: 36, marginBottom: 8 }}>📖</div>
-        <h2 style={{ margin: "0 0 8px", fontSize: 22, color: "#3f3344" }}>첫 이야기를 먼저 남겨볼까요?</h2>
-        <p style={{ margin: "0 0 18px", fontSize: 14, lineHeight: 1.6, color: "#7b7080" }}>
+        <div style={{ fontSize:36, marginBottom:8 }} aria-hidden="true">📖</div>
+        <h2 id={headingId} style={{ margin:"0 0 8px", fontSize:22, color:"#3f3344" }}>첫 이야기를 먼저 남겨볼까요?</h2>
+        <p style={{ margin:"0 0 18px", fontSize:14, lineHeight:1.6, color:"#7b7080" }}>
           태명 설정 다음에는 Chapter 1에서 출산 예정일, 처음 알게 된 날, 아기에게 보내는 첫 마음을 한 번만 작성해요. 저장 후에는 기록 메뉴에서 주차 기록 · 태교 활동 · 병원 기록을 선택해서 입력할 수 있어요.
         </p>
-        <button
-          type="button"
-          className="primary"
-          style={{ width: "100%", marginTop: 4 }}
-          onClick={() => {
-            setWriteTab("intro");
-            onClose();
-          }}
-        >
-          첫 이야기 작성하기
-        </button>
-        <button
-          type="button"
-          className="ghost"
-          style={{ width: "100%", marginTop: 8 }}
-          onClick={() => {
-            onClose();
-            setTab("home");
-          }}
-        >
-          홈으로 돌아가기
-        </button>
+        <button type="button" className="primary" style={{ width:"100%", marginTop:4 }} onClick={() => { setWriteTab("intro"); onClose(); }}>첫 이야기 작성하기</button>
+        <button type="button" className="ghost" style={{ width:"100%", marginTop:8 }} onClick={() => { onClose(); setTab("home"); }}>홈으로 돌아가기</button>
       </section>
     </div>
   );
@@ -1661,11 +1745,11 @@ export default function App() {
         )}
         {tab === "book" && <Book data={data} setData={setData} onEdit={handleEdit}/>}
         {tab === "settings" && <Settings data={data} setData={setData} setTab={setTab} showToast={showToast}/>}
-        <nav className="bottom">
-          <button className={tab === "home" ? "on" : ""} onClick={() => setTab("home")}><span>🏠</span>홈</button>
-          <button className={tab === "write" ? "on" : ""} onClick={openWrite}><span>✍️</span>기록</button>
-          <button className={tab === "book" ? "on" : ""} onClick={() => setTab("book")}><span>📖</span>태교북</button>
-          <button className={tab === "settings" ? "on" : ""} onClick={() => setTab("settings")}><span>⚙️</span>설정</button>
+        <nav className="bottom" aria-label="주요 메뉴">
+          <button className={tab === "home" ? "on" : ""} onClick={() => setTab("home")} aria-label="홈" aria-current={tab === "home" ? "page" : undefined}><span aria-hidden="true">🏠</span>홈</button>
+          <button className={tab === "write" ? "on" : ""} onClick={openWrite} aria-label="기록 작성" aria-current={tab === "write" ? "page" : undefined}><span aria-hidden="true">✍️</span>기록</button>
+          <button className={tab === "book" ? "on" : ""} onClick={() => setTab("book")} aria-label="태교북 보기" aria-current={tab === "book" ? "page" : undefined}><span aria-hidden="true">📖</span>태교북</button>
+          <button className={tab === "settings" ? "on" : ""} onClick={() => setTab("settings")} aria-label="설정" aria-current={tab === "settings" ? "page" : undefined}><span aria-hidden="true">⚙️</span>설정</button>
         </nav>
       </div>
     </div>
